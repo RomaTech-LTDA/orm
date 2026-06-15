@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>@romatech/orm - docs</title>
+	<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+	<style>
+		/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+		/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+		body {
+			font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+			font-size: var(--vscode-markdown-font-size, 14px);
+			padding: 0 26px;
+			line-height: var(--vscode-markdown-line-height, 22px);
+			word-wrap: break-word;
+		}
+
+		#code-csp-warning {
+			position: fixed;
+			top: 0;
+			right: 0;
+			color: white;
+			margin: 16px;
+			text-align: center;
+			font-size: 12px;
+			font-family: sans-serif;
+			background-color: #444444;
+			cursor: pointer;
+			padding: 6px;
+			box-shadow: 1px 1px 1px rgba(0, 0, 0, .25);
+		}
+
+		#code-csp-warning:hover {
+			text-decoration: none;
+			background-color: #007acc;
+			box-shadow: 2px 2px 2px rgba(0, 0, 0, .25);
+		}
+
+		body.scrollBeyondLastLine {
+			margin-bottom: calc(100vh - 22px);
+		}
+
+		body.showEditorSelection .code-line {
+			position: relative;
+		}
+
+		body.showEditorSelection .code-active-line:before,
+		body.showEditorSelection .code-line:hover:before {
+			content: "";
+			display: block;
+			position: absolute;
+			top: 0;
+			left: -12px;
+			height: 100%;
+		}
+
+		body.showEditorSelection li.code-active-line:before,
+		body.showEditorSelection li.code-line:hover:before {
+			left: -30px;
+		}
+
+		.vscode-light.showEditorSelection .code-active-line:before {
+			border-left: 3px solid rgba(0, 0, 0, 0.15);
+		}
+
+		.vscode-light.showEditorSelection .code-line:hover:before {
+			border-left: 3px solid rgba(0, 0, 0, 0.40);
+		}
+
+		.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+			border-left: none;
+		}
+
+		.vscode-dark.showEditorSelection .code-active-line:before {
+			border-left: 3px solid rgba(255, 255, 255, 0.4);
+		}
+
+		.vscode-dark.showEditorSelection .code-line:hover:before {
+			border-left: 3px solid rgba(255, 255, 255, 0.60);
+		}
+
+		.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+			border-left: none;
+		}
+
+		.vscode-high-contrast.showEditorSelection .code-active-line:before {
+			border-left: 3px solid rgba(255, 160, 0, 0.7);
+		}
+
+		.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+			border-left: 3px solid rgba(255, 160, 0, 1);
+		}
+
+		.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+			border-left: none;
+		}
+
+		img {
+			max-width: 100%;
+			max-height: 100%;
+		}
+
+		a {
+			text-decoration: none;
+		}
+
+		a:hover {
+			text-decoration: underline;
+		}
+
+		a:focus,
+		input:focus,
+		select:focus,
+		textarea:focus {
+			outline: 1px solid -webkit-focus-ring-color;
+			outline-offset: -1px;
+		}
+
+		hr {
+			border: 0;
+			height: 2px;
+			border-bottom: 2px solid;
+		}
+
+		h1 {
+			padding-bottom: 0.3em;
+			line-height: 1.2;
+			border-bottom-width: 1px;
+			border-bottom-style: solid;
+		}
+
+		h1,
+		h2,
+		h3 {
+			font-weight: normal;
+		}
+
+		table {
+			border-collapse: collapse;
+		}
+
+		table>thead>tr>th {
+			text-align: left;
+			border-bottom: 1px solid;
+		}
+
+		table>thead>tr>th,
+		table>thead>tr>td,
+		table>tbody>tr>th,
+		table>tbody>tr>td {
+			padding: 5px 10px;
+		}
+
+		table>tbody>tr+tr>td {
+			border-top: 1px solid;
+		}
+
+		blockquote {
+			margin: 0 7px 0 5px;
+			padding: 0 16px 0 10px;
+			border-left-width: 5px;
+			border-left-style: solid;
+		}
+
+		code {
+			font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+			font-size: 1em;
+			line-height: 1.357em;
+		}
+
+		body.wordWrap pre {
+			white-space: pre-wrap;
+		}
+
+		pre:not(.hljs),
+		pre.hljs code>div {
+			padding: 16px;
+			border-radius: 3px;
+			overflow: auto;
+		}
+
+		pre code {
+			color: var(--vscode-editor-foreground);
+			tab-size: 4;
+		}
+
+		/** Theming */
+
+		.vscode-light pre {
+			background-color: rgba(220, 220, 220, 0.4);
+		}
+
+		.vscode-dark pre {
+			background-color: rgba(10, 10, 10, 0.4);
+		}
+
+		.vscode-high-contrast pre {
+			background-color: rgb(0, 0, 0);
+		}
+
+		.vscode-high-contrast h1 {
+			border-color: rgb(0, 0, 0);
+		}
+
+		.vscode-light table>thead>tr>th {
+			border-color: rgba(0, 0, 0, 0.69);
+		}
+
+		.vscode-dark table>thead>tr>th {
+			border-color: rgba(255, 255, 255, 0.69);
+		}
+
+		.vscode-light h1,
+		.vscode-light hr,
+		.vscode-light table>tbody>tr+tr>td {
+			border-color: rgba(0, 0, 0, 0.18);
+		}
+
+		.vscode-dark h1,
+		.vscode-dark hr,
+		.vscode-dark table>tbody>tr+tr>td {
+			border-color: rgba(255, 255, 255, 0.18);
+		}
+	</style>
+
+	<style>
+		/* Tomorrow Theme */
+		/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+		/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+		/* Tomorrow Comment */
+		.hljs-comment,
+		.hljs-quote {
+			color: #8e908c;
+		}
+
+		/* Tomorrow Red */
+		.hljs-variable,
+		.hljs-template-variable,
+		.hljs-tag,
+		.hljs-name,
+		.hljs-selector-id,
+		.hljs-selector-class,
+		.hljs-regexp,
+		.hljs-deletion {
+			color: #c82829;
+		}
+
+		/* Tomorrow Orange */
+		.hljs-number,
+		.hljs-built_in,
+		.hljs-builtin-name,
+		.hljs-literal,
+		.hljs-type,
+		.hljs-params,
+		.hljs-meta,
+		.hljs-link {
+			color: #f5871f;
+		}
+
+		/* Tomorrow Yellow */
+		.hljs-attribute {
+			color: #eab700;
+		}
+
+		/* Tomorrow Green */
+		.hljs-string,
+		.hljs-symbol,
+		.hljs-bullet,
+		.hljs-addition {
+			color: #718c00;
+		}
+
+		/* Tomorrow Blue */
+		.hljs-title,
+		.hljs-section {
+			color: #4271ae;
+		}
+
+		/* Tomorrow Purple */
+		.hljs-keyword,
+		.hljs-selector-tag {
+			color: #8959a8;
+		}
+
+		.hljs {
+			display: block;
+			overflow-x: auto;
+			color: #4d4d4c;
+			padding: 0.5em;
+		}
+
+		.hljs-emphasis {
+			font-style: italic;
+		}
+
+		.hljs-strong {
+			font-weight: bold;
+		}
+	</style>
+
+	<style>
+		/*
+ * Markdown PDF CSS
+ */
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+			padding: 0 12px;
+		}
+
+		pre {
+			background-color: #f8f8f8;
+			border: 1px solid #cccccc;
+			border-radius: 3px;
+			overflow-x: auto;
+			white-space: pre-wrap;
+			overflow-wrap: break-word;
+		}
+
+		pre:not(.hljs) {
+			padding: 23px;
+			line-height: 19px;
+		}
+
+		blockquote {
+			background: rgba(127, 127, 127, 0.1);
+			border-color: rgba(0, 122, 204, 0.5);
+		}
+
+		.emoji {
+			height: 1.4em;
+		}
+
+		code {
+			font-size: 14px;
+			line-height: 19px;
+		}
+
+		/* for inline code */
+		:not(pre):not(.hljs)>code {
+			color: #C9AE75;
+			/* Change the old color so it seems less like an error */
+			font-size: inherit;
+		}
+
+		/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+		.page {
+			page-break-after: always;
+		}
+
+		header {
+			height: 60px;
+			display: flex;
+			align-items: center;
+			padding: 0 1rem;
+			gap: 1rem;
+			z-index: 1000;
+		}
+
+		header img {
+			height: 60px;
+			width: auto;
+		}
+
+		header h1 {
+			font-size: 1.25rem;
+			margin: 0;
+			flex-grow: 1;
+			user-select: none;
+		}
+
+		header nav.links {
+			display: flex;
+			gap: 1rem;
+		}
+
+		header nav.links a {
+			text-decoration: none;
+			font-weight: 600;
+			border: 1px solid;
+			padding: 0.25rem 0.75rem;
+			border-radius: 4px;
+			transition: background-color 0.3s;
+		}
+
+		header nav.links a:hover,
+		header nav.links a:focus {
+			background-color: rgba(255 255 255 / 0.3);
+			outline: none;
+		}
+	</style>
+
+	<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+	<script>
+		mermaid.initialize({
+			startOnLoad: true,
+			theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+				? 'dark'
+				: 'default'
+		});
+	</script>
+	<header>
+		<img src="logo.png" alt="RomaTech Logo" />
+		<h1 id="romatechorm">@romatech/orm</h1>
+		<nav class="links" aria-label="External links">
+			<a href="https://github.com/RomaTech-LTDA/orm" target="_blank" rel="noopener noreferrer"
+				aria-label="GitHub repository">GitHub</a>
+			<a href="https://www.npmjs.com/package/@romatech/orm" target="_blank" rel="noopener noreferrer"
+				aria-label="NPM package page">NPM</a>
+		</nav>
+	</header>
+	<p>
+		A TypeScript ORM for Node.js inspired by <strong>Entity Framework Core</strong>.
+	</p>
+	<hr>
+	<h2 id="table-of-contents">Table of Contents</h2>
+	<ul>
+		<li><a href="#features">Features</a></li>
+		<li><a href="#installation">Installation</a></li>
+		<li><a href="#quick-start">Quick Start</a></li>
+		<li><a href="#entities--decorators">Entities &amp; Decorators</a></li>
+		<li><a href="#dbcontext">DbContext</a></li>
+		<li><a href="#dbset--crud">DbSet &amp; CRUD</a></li>
+		<li><a href="#querybuilder-linq-style">QueryBuilder (LINQ-style)</a></li>
+		<li><a href="#migrations">Migrations</a></li>
+		<li><a href="#scaffold-database-first">Scaffold (Database-First)</a></li>
+		<li><a href="#providers">Providers</a></li>
+		<li><a href="#cli">CLI</a></li>
+		<li><a href="#configuration">Configuration</a></li>
+		<li><a href="#api-reference">API Reference</a></li>
+		<li><a href="#license">License</a></li>
+	</ul>
+	<hr>
+	<h2 id="features">Features</h2>
+	<table>
+		<thead>
+			<tr>
+				<th>Feature</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><strong>Decorator-based entities</strong></td>
+				<td><code>@Entity</code>, <code>@Column</code>, <code>@PrimaryKey</code>, <code>@NotMapped</code>,
+					relationships</td>
+			</tr>
+			<tr>
+				<td><strong>DbContext</strong></td>
+				<td>Unit-of-Work pattern with <code>saveChanges()</code></td>
+			</tr>
+			<tr>
+				<td><strong>DbSet&lt;T&gt;</strong></td>
+				<td>Typed sets with CRUD, change tracking, and fluent queries</td>
+			</tr>
+			<tr>
+				<td><strong>QueryBuilder</strong></td>
+				<td>LINQ-style API: <code>where</code>, <code>select</code>, <code>orderBy</code>, <code>skip</code>,
+					<code>take</code>, <code>first</code>, <code>single</code>, <code>any</code>, <code>all</code>,
+					<code>count</code>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>SQL generation</strong></td>
+				<td>Predicates and orderings are pushed to the database when parseable</td>
+			</tr>
+			<tr>
+				<td><strong>Client-side fallback</strong></td>
+				<td>Unparseable expressions are evaluated in-memory transparently</td>
+			</tr>
+			<tr>
+				<td><strong>Auto-connect</strong></td>
+				<td>Connection opens automatically on the first database operation</td>
+			</tr>
+			<tr>
+				<td><strong>Migrations</strong></td>
+				<td>Create, apply, and revert schema changes via JSON migration files</td>
+			</tr>
+			<tr>
+				<td><strong>Scaffold</strong></td>
+				<td>Reverse-engineer entities and DbContext from an existing database</td>
+			</tr>
+			<tr>
+				<td><strong>Multiple providers</strong></td>
+				<td>SQL Server, MySQL, PostgreSQL, Oracle, In-Memory</td>
+			</tr>
+			<tr>
+				<td><strong>Dual naming</strong></td>
+				<td>Both camelCase (<code>where</code>, <code>toList</code>) and PascalCase (<code>Where</code>,
+					<code>ToList</code>)
+				</td>
+			</tr>
+		</tbody>
+	</table>
+	<hr>
+	<h2 id="installation">Installation</h2>
+	<pre class="hljs"><code><div>npm install @romatech/orm reflect-metadata
+</div></code></pre>
+	<p>Then install the provider for your database:</p>
+	<pre class="hljs"><code><div><span class="hljs-comment"># Pick one:</span>
+npm install @romatech/orm-providers-mssql    <span class="hljs-comment"># SQL Server</span>
+npm install @romatech/orm-providers-mysql    <span class="hljs-comment"># MySQL / MariaDB</span>
+npm install @romatech/orm-providers-pgsql    <span class="hljs-comment"># PostgreSQL</span>
+npm install @romatech/orm-providers-oracle   <span class="hljs-comment"># Oracle</span>
+npm install @romatech/orm-providers-memory   <span class="hljs-comment"># In-Memory (testing)</span>
+</div></code></pre>
+	<h3 id="typescript-configuration">TypeScript Configuration</h3>
+	<p>Add to your <code>tsconfig.json</code>:</p>
+	<pre class="hljs"><code><div><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;compilerOptions&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;experimentalDecorators&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;emitDecoratorMetadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</div></code></pre>
+	<h3 id="entry-point">Entry Point</h3>
+	<p>Import <code>reflect-metadata</code> <strong>once</strong> at your application entry point (before anything
+		else):</p>
+	<pre class="hljs"><code><div><span class="hljs-keyword">import</span> <span class="hljs-string">&#x27;reflect-metadata&#x27;</span>;
+</div></code></pre>
+	<hr>
+	<h2 id="quick-start">Quick Start</h2>
+	<pre class="hljs"><code><div><span class="hljs-keyword">import</span> <span class="hljs-string">&#x27;reflect-metadata&#x27;</span>;
+<span class="hljs-keyword">import</span> { <span class="hljs-title class_">Entity</span>, <span class="hljs-title class_">PrimaryKey</span>, <span class="hljs-title class_">Column</span>, <span class="hljs-title class_">DbContext</span>, <span class="hljs-title class_">DbContextOptions</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;@romatech/orm&#x27;</span>;
+<span class="hljs-keyword">import</span> { <span class="hljs-title class_">MemoryProvider</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;@romatech/orm-providers-memory&#x27;</span>;
+
+<span class="hljs-comment">// 1. Define an entity</span>
+<span class="hljs-meta">@Entity</span>(<span class="hljs-string">&#x27;Users&#x27;</span>)
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">User</span> {
+    <span class="hljs-meta">@PrimaryKey</span>()
+    id!: <span class="hljs-built_in">number</span>;
+
+    <span class="hljs-meta">@Column</span>()
+    name!: <span class="hljs-built_in">string</span>;
+
+    <span class="hljs-meta">@Column</span>()
+    email!: <span class="hljs-built_in">string</span>;
+}
+
+<span class="hljs-comment">// 2. Create a context</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">AppDbContext</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_ inherited__">DbContext</span> {
+    users = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">set</span>(<span class="hljs-title class_">User</span>);
+
+    <span class="hljs-title function_">constructor</span>(<span class="hljs-params"></span>) {
+        <span class="hljs-variable language_">super</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">DbContextOptions</span>().<span class="hljs-title function_">useProvider</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MemoryProvider</span>()));
+    }
+}
+
+<span class="hljs-comment">// 3. Use it</span>
+<span class="hljs-keyword">const</span> db = <span class="hljs-keyword">new</span> <span class="hljs-title class_">AppDbContext</span>();
+
+db.<span class="hljs-property">users</span>.<span class="hljs-title function_">add</span>({ <span class="hljs-attr">id</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Alice&#x27;</span>, <span class="hljs-attr">email</span>: <span class="hljs-string">&#x27;alice@example.com&#x27;</span> });
+<span class="hljs-keyword">await</span> db.<span class="hljs-title function_">saveChanges</span>();
+
+<span class="hljs-keyword">const</span> alice = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title class_">FirstOrDefault</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">name</span> === <span class="hljs-string">&#x27;Alice&#x27;</span>);
+<span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(alice); <span class="hljs-comment">// { id: 1, name: &#x27;Alice&#x27;, email: &#x27;alice@example.com&#x27; }</span>
+</div></code></pre>
+	<hr>
+	<h2 id="entities--decorators">Entities &amp; Decorators</h2>
+	<h3 id="entitytablename"><code>@Entity(tableName?)</code></h3>
+	<p>Marks a class as a database entity. The optional <code>tableName</code> parameter specifies the database table
+		name (defaults to the class name).</p>
+	<pre class="hljs"><code><div><span class="hljs-meta">@Entity</span>(<span class="hljs-string">&#x27;Products&#x27;</span>)
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Product</span> { ... }
+</div></code></pre>
+	<h3 id="primarykeyoptions"><code>@PrimaryKey(options?)</code></h3>
+	<p>Marks a property as the primary key.</p>
+	<pre class="hljs"><code><div><span class="hljs-meta">@PrimaryKey</span>()
+id!: <span class="hljs-built_in">number</span>;
+</div></code></pre>
+	<h3 id="columnoptions"><code>@Column(options?)</code></h3>
+	<p>Marks a property as a mapped column.</p>
+	<pre class="hljs"><code><div><span class="hljs-meta">@Column</span>({ <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;user_name&#x27;</span>, <span class="hljs-attr">length</span>: <span class="hljs-number">255</span>, <span class="hljs-attr">nullable</span>: <span class="hljs-literal">true</span> })
+name!: <span class="hljs-built_in">string</span>;
+</div></code></pre>
+	<p><strong>ColumnOptions:</strong></p>
+	<table>
+		<thead>
+			<tr>
+				<th>Option</th>
+				<th>Type</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>name</code></td>
+				<td><code>string</code></td>
+				<td>Database column name (defaults to property name)</td>
+			</tr>
+			<tr>
+				<td><code>type</code></td>
+				<td><code>string</code></td>
+				<td>Explicit type override</td>
+			</tr>
+			<tr>
+				<td><code>nullable</code></td>
+				<td><code>boolean</code></td>
+				<td>Whether the column allows NULL</td>
+			</tr>
+			<tr>
+				<td><code>unique</code></td>
+				<td><code>boolean</code></td>
+				<td>Whether the column has a UNIQUE constraint</td>
+			</tr>
+			<tr>
+				<td><code>default</code></td>
+				<td><code>any</code></td>
+				<td>Default value</td>
+			</tr>
+			<tr>
+				<td><code>length</code></td>
+				<td><code>number</code></td>
+				<td>Maximum length for string columns</td>
+			</tr>
+		</tbody>
+	</table>
+	<h3 id="notmapped"><code>@NotMapped</code></h3>
+	<p>Excludes a property from the database mapping.</p>
+	<pre class="hljs"><code><div><span class="hljs-meta">@NotMapped</span>
+<span class="hljs-attr">temporaryField</span>?: <span class="hljs-built_in">string</span>;
+</div></code></pre>
+	<h3 id="relationships">Relationships</h3>
+	<pre class="hljs"><code><div><span class="hljs-meta">@OneToMany</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title class_">Order</span>, <span class="hljs-string">&#x27;user&#x27;</span>)
+orders!: <span class="hljs-title class_">Order</span>[];
+
+<span class="hljs-meta">@ManyToOne</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title class_">User</span>)
+user!: <span class="hljs-title class_">User</span>;
+
+<span class="hljs-meta">@OneToOne</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title class_">Profile</span>, <span class="hljs-string">&#x27;user&#x27;</span>)
+profile!: <span class="hljs-title class_">Profile</span>;
+
+<span class="hljs-meta">@ManyToMany</span>(<span class="hljs-function">() =&gt;</span> <span class="hljs-title class_">Tag</span>, <span class="hljs-string">&#x27;products&#x27;</span>)
+tags!: <span class="hljs-title class_">Tag</span>[];
+</div></code></pre>
+	<hr>
+	<h2 id="dbcontext">DbContext</h2>
+	<p>The <code>DbContext</code> is the central class for database interaction. It manages the connection lifecycle,
+		tracks changes, and exposes typed <code>DbSet</code>s.</p>
+	<pre class="hljs"><code><div><span class="hljs-keyword">class</span> <span class="hljs-title class_">AppDbContext</span> <span class="hljs-keyword">extends</span> <span class="hljs-title class_ inherited__">DbContext</span> {
+    users = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">set</span>(<span class="hljs-title class_">User</span>);
+    products = <span class="hljs-variable language_">this</span>.<span class="hljs-title function_">set</span>(<span class="hljs-title class_">Product</span>);
+
+    <span class="hljs-title function_">constructor</span>(<span class="hljs-params"></span>) {
+        <span class="hljs-variable language_">super</span>(
+            <span class="hljs-keyword">new</span> <span class="hljs-title class_">DbContextOptions</span>()
+                .<span class="hljs-title function_">useProvider</span>(<span class="hljs-keyword">new</span> <span class="hljs-title class_">MsSqlProvider</span>({ ... }))
+                .<span class="hljs-title function_">withConnectionString</span>(<span class="hljs-string">&#x27;Server=localhost;Database=MyDb;...&#x27;</span>)
+        );
+    }
+}
+</div></code></pre>
+	<h3 id="connection-lifecycle">Connection Lifecycle</h3>
+	<table>
+		<thead>
+			<tr>
+				<th>Method</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>connect()</code></td>
+				<td>Opens the connection (called automatically by default)</td>
+			</tr>
+			<tr>
+				<td><code>disconnect()</code></td>
+				<td>Closes the connection</td>
+			</tr>
+			<tr>
+				<td><code>connectionState</code></td>
+				<td>Current state: <code>Disconnected</code>, <code>Connecting</code>, <code>Connected</code>,
+					<code>Disconnecting</code>, <code>Error</code>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+	<p>Auto-connect is enabled by default. To disable:</p>
+	<pre class="hljs"><code><div><span class="hljs-keyword">new</span> <span class="hljs-title class_">DbContextOptions</span>().<span class="hljs-title function_">useProvider</span>(provider).<span class="hljs-title function_">disableAutoConnect</span>();
+<span class="hljs-comment">// You must now call db.connect() manually before any operation.</span>
+</div></code></pre>
+	<h3 id="savechanges"><code>saveChanges()</code></h3>
+	<p>Persists all pending add/update/remove operations across all DbSets.</p>
+	<pre class="hljs"><code><div>db.<span class="hljs-property">users</span>.<span class="hljs-title function_">add</span>(newUser);
+db.<span class="hljs-property">products</span>.<span class="hljs-title function_">remove</span>(oldProduct);
+<span class="hljs-keyword">await</span> db.<span class="hljs-title function_">saveChanges</span>(); <span class="hljs-comment">// Both operations are flushed here</span>
+</div></code></pre>
+	<hr>
+	<h2 id="dbset--crud">DbSet &amp; CRUD</h2>
+	<h3 id="adding-entities">Adding Entities</h3>
+	<pre class="hljs"><code><div>db.<span class="hljs-property">users</span>.<span class="hljs-title function_">add</span>({ <span class="hljs-attr">id</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">name</span>: <span class="hljs-string">&#x27;Alice&#x27;</span>, <span class="hljs-attr">email</span>: <span class="hljs-string">&#x27;alice@example.com&#x27;</span>, <span class="hljs-attr">age</span>: <span class="hljs-number">30</span> });
+db.<span class="hljs-property">users</span>.<span class="hljs-title function_">addRange</span>([user1, user2, user3]);
+<span class="hljs-keyword">await</span> db.<span class="hljs-title function_">saveChanges</span>();
+</div></code></pre>
+	<h3 id="updating-entities">Updating Entities</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">const</span> user = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title class_">FirstOrDefault</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">id</span> === <span class="hljs-number">1</span>);
+user!.<span class="hljs-property">name</span> = <span class="hljs-string">&#x27;Updated Name&#x27;</span>;
+db.<span class="hljs-property">users</span>.<span class="hljs-title function_">update</span>(user!);
+<span class="hljs-keyword">await</span> db.<span class="hljs-title function_">saveChanges</span>();
+</div></code></pre>
+	<h3 id="removing-entities">Removing Entities</h3>
+	<pre class="hljs"><code><div>db.<span class="hljs-property">users</span>.<span class="hljs-title function_">remove</span>(user);
+db.<span class="hljs-property">users</span>.<span class="hljs-title function_">removeRange</span>([user1, user2]);
+<span class="hljs-keyword">await</span> db.<span class="hljs-title function_">saveChanges</span>();
+</div></code></pre>
+	<h3 id="fetching-all">Fetching All</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">const</span> allUsers = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title class_">ToList</span>();
+</div></code></pre>
+	<hr>
+	<h2 id="querybuilder-linq-style">QueryBuilder (LINQ-style)</h2>
+	<p>The QueryBuilder provides a fluent, chainable API inspired by C# LINQ.</p>
+	<h3 id="filtering--where">Filtering — <code>where()</code></h3>
+	<pre class="hljs"><code><div><span class="hljs-comment">// Simple comparison</span>
+<span class="hljs-keyword">const</span> adults = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title function_">where</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">age</span> &gt;= <span class="hljs-number">18</span>).<span class="hljs-title function_">toList</span>();
+
+<span class="hljs-comment">// String methods (translated to SQL LIKE)</span>
+<span class="hljs-keyword">const</span> results = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title function_">where</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">name</span>.<span class="hljs-title function_">startsWith</span>(<span class="hljs-string">&#x27;A&#x27;</span>)).<span class="hljs-title function_">toList</span>();
+<span class="hljs-keyword">const</span> search = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title function_">where</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">email</span>.<span class="hljs-title function_">includes</span>(<span class="hljs-string">&#x27;@gmail&#x27;</span>)).<span class="hljs-title function_">toList</span>();
+
+<span class="hljs-comment">// Multiple conditions (AND)</span>
+<span class="hljs-keyword">const</span> active = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>
+    .<span class="hljs-title function_">where</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">isActive</span>)
+    .<span class="hljs-title function_">where</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">age</span> &gt; <span class="hljs-number">21</span>)
+    .<span class="hljs-title function_">toList</span>();
+
+<span class="hljs-comment">// Combined with OR / AND (inside one predicate)</span>
+<span class="hljs-keyword">const</span> filtered = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>
+    .<span class="hljs-title function_">where</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">role</span> === <span class="hljs-string">&#x27;admin&#x27;</span> || u.<span class="hljs-property">role</span> === <span class="hljs-string">&#x27;moderator&#x27;</span>)
+    .<span class="hljs-title function_">toList</span>();
+</div></code></pre>
+	<h3 id="projection--select">Projection — <code>select()</code></h3>
+	<pre class="hljs"><code><div><span class="hljs-comment">// Single field</span>
+<span class="hljs-keyword">const</span> names = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>.<span class="hljs-title function_">select</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">name</span>).<span class="hljs-title function_">toList</span>(); <span class="hljs-comment">// string[]</span>
+
+<span class="hljs-comment">// Object projection</span>
+<span class="hljs-keyword">const</span> dtos = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>
+    .<span class="hljs-title function_">select</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> ({ <span class="hljs-attr">id</span>: u.<span class="hljs-property">id</span>, <span class="hljs-attr">name</span>: u.<span class="hljs-property">name</span> }))
+    .<span class="hljs-title function_">toList</span>(); <span class="hljs-comment">// { id: number; name: string }[]</span>
+</div></code></pre>
+	<h3 id="ordering--orderby-orderbydescending-thenby">Ordering — <code>orderBy()</code>,
+		<code>orderByDescending()</code>, <code>thenBy()</code>
+	</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">const</span> sorted = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>
+    .<span class="hljs-title function_">orderBy</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">lastName</span>)
+    .<span class="hljs-title function_">thenBy</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">firstName</span>)
+    .<span class="hljs-title function_">toList</span>();
+
+<span class="hljs-keyword">const</span> newest = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>
+    .<span class="hljs-title function_">orderByDescending</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">createdAt</span>)
+    .<span class="hljs-title function_">toList</span>();
+</div></code></pre>
+	<h3 id="paging--skip--take">Paging — <code>skip()</code> / <code>take()</code></h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">const</span> page3 = <span class="hljs-keyword">await</span> db.<span class="hljs-property">users</span>
+    .<span class="hljs-title function_">orderBy</span>(<span class="hljs-function"><span class="hljs-params">u</span> =&gt;</span> u.<span class="hljs-property">id</span>)
+    .<span class="hljs-title function_">skip</span>(<span class="hljs-number">40</span>)
+    .<span class="hljs-title function_">take</span>(<span class="hljs-number">20</span>)
+    .<span class="hljs-title function_">toList</span>();
+</div></code></pre>
+	<h3 id="terminal-methods">Terminal Methods</h3>
+	<table>
+		<thead>
+			<tr>
+				<th>Method</th>
+				<th>Returns</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>toList()</code> / <code>ToList()</code></td>
+				<td><code>Promise&lt;T[]&gt;</code></td>
+				<td>Execute and return all matching rows</td>
+			</tr>
+			<tr>
+				<td><code>toArray()</code> / <code>ToArray()</code></td>
+				<td><code>Promise&lt;T[]&gt;</code></td>
+				<td>Alias for <code>toList()</code></td>
+			</tr>
+			<tr>
+				<td><code>first(predicate?)</code> / <code>First()</code></td>
+				<td><code>Promise&lt;T&gt;</code></td>
+				<td>First match or throws</td>
+			</tr>
+			<tr>
+				<td><code>firstOrDefault(predicate?)</code> / <code>FirstOrDefault()</code></td>
+				<td><code>Promise&lt;T | undefined&gt;</code></td>
+				<td>First match or undefined</td>
+			</tr>
+			<tr>
+				<td><code>single(predicate?)</code> / <code>Single()</code></td>
+				<td><code>Promise&lt;T&gt;</code></td>
+				<td>Exactly one or throws</td>
+			</tr>
+			<tr>
+				<td><code>singleOrDefault(predicate?)</code> / <code>SingleOrDefault()</code></td>
+				<td><code>Promise&lt;T | undefined&gt;</code></td>
+				<td>Exactly one or undefined</td>
+			</tr>
+			<tr>
+				<td><code>any(predicate?)</code> / <code>Any()</code></td>
+				<td><code>Promise&lt;boolean&gt;</code></td>
+				<td>Whether any row matches</td>
+			</tr>
+			<tr>
+				<td><code>all(predicate)</code> / <code>All()</code></td>
+				<td><code>Promise&lt;boolean&gt;</code></td>
+				<td>Whether every row matches</td>
+			</tr>
+			<tr>
+				<td><code>count(predicate?)</code> / <code>Count()</code></td>
+				<td><code>Promise&lt;number&gt;</code></td>
+				<td>Number of matching rows</td>
+			</tr>
+		</tbody>
+	</table>
+	<h3 id="include-eager-loading">Include (Eager Loading)</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">const</span> orders = <span class="hljs-keyword">await</span> db.<span class="hljs-property">orders</span>
+    .<span class="hljs-title function_">include</span>(<span class="hljs-function"><span class="hljs-params">o</span> =&gt;</span> o.<span class="hljs-property">customer</span>)
+    .<span class="hljs-title function_">thenInclude</span>(<span class="hljs-function"><span class="hljs-params">c</span> =&gt;</span> c.<span class="hljs-property">address</span>)
+    .<span class="hljs-title function_">toList</span>();
+</div></code></pre>
+	<hr>
+	<h2 id="migrations">Migrations</h2>
+	<h3 id="creating-a-migration">Creating a Migration</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">import</span> { <span class="hljs-title class_">MigrationService</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;@romatech/orm&#x27;</span>;
+
+<span class="hljs-keyword">const</span> service = <span class="hljs-keyword">new</span> <span class="hljs-title class_">MigrationService</span>(provider, <span class="hljs-string">&#x27;./migrations&#x27;</span>);
+<span class="hljs-keyword">const</span> name = <span class="hljs-keyword">await</span> service.<span class="hljs-title function_">createMigration</span>(<span class="hljs-string">&#x27;AddUsersTable&#x27;</span>);
+<span class="hljs-comment">// Creates: migrations/20260605120000_AddUsersTable.migration.json</span>
+</div></code></pre>
+	<h3 id="applying-migrations">Applying Migrations</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">await</span> service.<span class="hljs-title function_">updateDatabase</span>(); <span class="hljs-comment">// Apply all pending</span>
+<span class="hljs-keyword">await</span> service.<span class="hljs-title function_">updateDatabase</span>(<span class="hljs-string">&#x27;20260605120000_AddUsersTable&#x27;</span>); <span class="hljs-comment">// Apply up to this one</span>
+</div></code></pre>
+	<h3 id="reverting-migrations">Reverting Migrations</h3>
+	<pre class="hljs"><code><div><span class="hljs-keyword">await</span> service.<span class="hljs-title function_">downgradeDatabase</span>(); <span class="hljs-comment">// Revert last</span>
+<span class="hljs-keyword">await</span> service.<span class="hljs-title function_">downgradeDatabase</span>(<span class="hljs-string">&#x27;20260605120000_Initial&#x27;</span>); <span class="hljs-comment">// Revert everything after this</span>
+</div></code></pre>
+	<h3 id="migration-file-format">Migration File Format</h3>
+	<pre class="hljs"><code><div><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;migrationName&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;20260605120000_AddUsersTable&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;up&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;action&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;createTable&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;table&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Users&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;columns&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+        <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;id&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;primaryKey&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;tsType&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;number&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;name&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;tsType&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;string&quot;</span> <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;name&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;email&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;tsType&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;string&quot;</span> <span class="hljs-punctuation">}</span>
+      <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;down&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span> <span class="hljs-attr">&quot;action&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;dropTable&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-attr">&quot;table&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Users&quot;</span> <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span>
+</div></code></pre>
+	<hr>
+	<h2 id="scaffold-database-first">Scaffold (Database-First)</h2>
+	<p>Reverse-engineer entity classes from an existing database:</p>
+	<pre class="hljs"><code><div><span class="hljs-keyword">import</span> { <span class="hljs-title class_">ScaffoldService</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;@romatech/orm&#x27;</span>;
+
+<span class="hljs-keyword">const</span> service = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ScaffoldService</span>(provider);
+<span class="hljs-keyword">await</span> service.<span class="hljs-title function_">generateEntitiesFromDb</span>(<span class="hljs-string">&#x27;src/entities&#x27;</span>, <span class="hljs-string">&#x27;src/context&#x27;</span>, <span class="hljs-string">&#x27;AppDbContext&#x27;</span>);
+</div></code></pre>
+	<p>This generates decorated entity files and a DbContext with typed DbSets for each table found in the database.</p>
+	<hr>
+	<h2 id="providers">Providers</h2>
+	<table>
+		<thead>
+			<tr>
+				<th>Package</th>
+				<th>Database</th>
+				<th>Install</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>@romatech/orm-providers-mssql</code></td>
+				<td>SQL Server</td>
+				<td><code>npm i @romatech/orm-providers-mssql</code></td>
+			</tr>
+			<tr>
+				<td><code>@romatech/orm-providers-mysql</code></td>
+				<td>MySQL / MariaDB</td>
+				<td><code>npm i @romatech/orm-providers-mysql</code></td>
+			</tr>
+			<tr>
+				<td><code>@romatech/orm-providers-pgsql</code></td>
+				<td>PostgreSQL</td>
+				<td><code>npm i @romatech/orm-providers-pgsql</code></td>
+			</tr>
+			<tr>
+				<td><code>@romatech/orm-providers-oracle</code></td>
+				<td>Oracle Database</td>
+				<td><code>npm i @romatech/orm-providers-oracle</code></td>
+			</tr>
+			<tr>
+				<td><code>@romatech/orm-providers-memory</code></td>
+				<td>In-Memory (testing)</td>
+				<td><code>npm i @romatech/orm-providers-memory</code></td>
+			</tr>
+		</tbody>
+	</table>
+	<hr>
+	<h2 id="cli">CLI</h2>
+	<pre class="hljs"><code><div>npm install -g @romatech/orm-cli
+</div></code></pre>
+	<table>
+		<thead>
+			<tr>
+				<th>Command</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>orm migration:create &lt;name&gt;</code></td>
+				<td>Create a migration file</td>
+			</tr>
+			<tr>
+				<td><code>orm update-database</code></td>
+				<td>Apply pending migrations</td>
+			</tr>
+			<tr>
+				<td><code>orm downgrade-database</code></td>
+				<td>Revert last migration</td>
+			</tr>
+			<tr>
+				<td><code>orm scaffold</code></td>
+				<td>Generate entities from DB</td>
+			</tr>
+		</tbody>
+	</table>
+	<p>See <a href="https://www.npmjs.com/package/@romatech/orm-cli">@romatech/orm-cli README</a> for full
+		documentation.</p>
+	<hr>
+	<h2 id="configuration">Configuration</h2>
+	<h3 id="dbcontextoptions">DbContextOptions</h3>
+	<table>
+		<thead>
+			<tr>
+				<th>Method</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>useProvider(provider, connectionString?)</code></td>
+				<td>Set the database provider</td>
+			</tr>
+			<tr>
+				<td><code>withConnectionString(str)</code></td>
+				<td>Override the connection string</td>
+			</tr>
+			<tr>
+				<td><code>disableAutoConnect()</code></td>
+				<td>Require manual <code>connect()</code> calls</td>
+			</tr>
+		</tbody>
+	</table>
+	<h3 id="sqldialect-for-provider-authors">SqlDialect (for provider authors)</h3>
+	<p>Each provider defines a <code>SqlDialect</code> object:</p>
+	<pre class="hljs"><code><div><span class="hljs-keyword">interface</span> <span class="hljs-title class_">SqlDialect</span> {
+    <span class="hljs-title function_">quoteIdentifier</span>(<span class="hljs-attr">identifier</span>: <span class="hljs-built_in">string</span>): <span class="hljs-built_in">string</span>; <span class="hljs-comment">// e.g. [col] or `col` or &quot;col&quot;</span>
+    <span class="hljs-title function_">parameter</span>(<span class="hljs-attr">index</span>: <span class="hljs-built_in">number</span>): <span class="hljs-built_in">string</span>;            <span class="hljs-comment">// e.g. @param0, $1, ?, :1</span>
+}
+</div></code></pre>
+	<hr>
+	<h2 id="api-reference">API Reference</h2>
+	<h3 id="core-classes">Core Classes</h3>
+	<ul>
+		<li><code>DbContext</code> — Base class for database contexts</li>
+		<li><code>DbContextOptions</code> — Configuration builder</li>
+		<li><code>DbSet&lt;T&gt;</code> — Typed entity collection with CRUD and queries</li>
+		<li><code>QueryBuilder&lt;T, TResult&gt;</code> — Fluent query builder</li>
+	</ul>
+	<h3 id="decorators">Decorators</h3>
+	<ul>
+		<li><code>@Entity(tableName?)</code> — Mark a class as an entity</li>
+		<li><code>@PrimaryKey(options?)</code> — Mark the primary key property</li>
+		<li><code>@Column(options?)</code> — Mark a column property</li>
+		<li><code>@NotMapped</code> — Exclude a property</li>
+		<li><code>@OneToMany</code>, <code>@ManyToOne</code>, <code>@OneToOne</code>, <code>@ManyToMany</code> —
+			Relationships</li>
+	</ul>
+	<h3 id="services">Services</h3>
+	<ul>
+		<li><code>MigrationService</code> — Create, apply, and revert migrations</li>
+		<li><code>ScaffoldService</code> — Reverse-engineer entities from a database</li>
+	</ul>
+	<h3 id="sql-generation">SQL Generation</h3>
+	<ul>
+		<li><code>buildSelectSql()</code> — Generate parameterised SELECT queries</li>
+		<li><code>buildInsertSql()</code> — Generate INSERT statements</li>
+		<li><code>buildUpdateSql()</code> — Generate UPDATE statements</li>
+		<li><code>buildDeleteSql()</code> — Generate DELETE statements</li>
+		<li><code>applyClientSideQuery()</code> — Client-side filter/sort/page/project</li>
+	</ul>
+	<h3 id="expression-types">Expression Types</h3>
+	<ul>
+		<li><code>QueryExpression</code> — Discriminated union for WHERE tree nodes</li>
+		<li><code>QueryObject&lt;T, TResult&gt;</code> — Complete query descriptor</li>
+		<li><code>SqlDialect</code> — Identifier quoting and parameter style</li>
+	</ul>
+	<hr>
+	<h2 id="license">License</h2>
+	<p>MIT © <a href="https://github.com/romatech-ltda">RomaTech / Leandro Romanelli</a></p>
+
+</body>
+
+</html>
