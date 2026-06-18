@@ -1,62 +1,62 @@
 {
-    "name":  "@romatech/orm",
-    "version": "1.1.0",
-    "description":  "TypeScript ORM for Node.js inspired by Entity Framework Core",
-    "author":  "RomaTech/Leandro Romanelli",
-    "license":  "MIT",
-    "repository":  {
-                       "type":  "git",
-                       "url":  "https://github.com/RomaTech-LTDA/orm"
-                   },
-    "homepage":  "https://github.com/RomaTech-LTDA/orm#readme",
-    "bugs":  {
-                 "url":  "https://github.com/RomaTech-LTDA/orm/issues"
-             },
-    "keywords":  [
-                     "orm",
-                     "database",
-                     "typescript",
-                     "entity-framework",
-                     "efcore",
-                     "sql",
-                     "mssql",
-                     "mysql",
-                     "postgresql",
-                     "oracle",
-                     "migrations",
-                     "scaffold"
-                 ],
-    "main":  "dist/index.js",
-    "types":  "dist/index.d.ts",
-    "exports":  {
-                    ".":  {
-                              "types":  "./dist/index.d.ts",
-                              "default":  "./dist/index.js"
-                          }
-                },
-    "files":  [
-                  "dist",
-                  "README.md",
-                  "LICENSE"
-              ],
-    "scripts":  {
-                    "clean":  "rimraf dist",
-                    "build":  "npm run clean \u0026\u0026 tsc",
-                    "watch":  "tsc --watch"
-                },
-    "dependencies":  {
-                         "reflect-metadata":  "^0.2.2"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^24.1.0",
-                            "rimraf":  "^6.0.1",
-                            "ts-node":  "^10.9.2",
-                            "typescript":  "^5.9.3"
-                        },
-    "engines":  {
-                    "node":  "\u003e=18"
-                },
-    "publishConfig":  {
-                          "access":  "public"
-                      }
+    "name": "@romatech/orm",
+    "version": "1.2.0",
+    "description": "TypeScript ORM for Node.js inspired by Entity Framework Core",
+    "author": "RomaTech/Leandro Romanelli",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/RomaTech-LTDA/orm"
+    },
+    "homepage": "https://github.com/RomaTech-LTDA/orm#readme",
+    "bugs": {
+        "url": "https://github.com/RomaTech-LTDA/orm/issues"
+    },
+    "keywords": [
+        "orm",
+        "database",
+        "typescript",
+        "entity-framework",
+        "efcore",
+        "sql",
+        "mssql",
+        "mysql",
+        "postgresql",
+        "oracle",
+        "migrations",
+        "scaffold"
+    ],
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "clean": "rimraf dist",
+        "build": "npm run clean && tsc",
+        "watch": "tsc --watch"
+    },
+    "dependencies": {
+        "reflect-metadata": "^0.2.2"
+    },
+    "devDependencies": {
+        "@types/node": "^24.1.0",
+        "rimraf": "^6.0.1",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.3"
+    },
+    "engines": {
+        "node": ">=18"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
 }
