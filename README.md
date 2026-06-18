@@ -48,7 +48,8 @@
 | **Auto-connect** | Connection opens automatically on the first database operation |
 | **Migrations** | Create, apply, and revert schema changes via JSON migration files |
 | **Scaffold** | Reverse-engineer entities and DbContext from an existing database |
-| **Multiple providers** | SQL Server, MySQL, PostgreSQL, Oracle, In-Memory |
+| **Multiple providers** | SQL Server, MySQL, PostgreSQL, Oracle, MongoDB, In-Memory |
+| **Transactions** | `beginTransaction()`, `commit()`, `rollback()` for atomic operations |
 | **Dual naming** | Both camelCase (`where`, `toList`) and PascalCase (`Where`, `ToList`) |
 
 ---
@@ -67,6 +68,7 @@ npm install @romatech/orm-providers-mssql    # SQL Server
 npm install @romatech/orm-providers-mysql    # MySQL / MariaDB
 npm install @romatech/orm-providers-pgsql    # PostgreSQL
 npm install @romatech/orm-providers-oracle   # Oracle
+npm install @romatech/orm-providers-mongodb  # MongoDB (NoSQL)
 npm install @romatech/orm-providers-memory   # In-Memory (testing)
 ```
 
@@ -367,6 +369,36 @@ const orders = await db.orders
 
 ---
 
+## Transactions
+
+Wrap multiple operations in a transaction for atomicity:
+
+```ts
+const tx = await db.beginTransaction();
+try {
+    db.users.add(newUser);
+    db.orders.add(newOrder);
+    await db.saveChanges();
+    await tx.commit();
+} catch (err) {
+    await tx.rollback();
+    throw err;
+}
+```
+
+Transaction support depends on the provider:
+
+| Provider | Transactions |
+|----------|-------------|
+| SQL Server | ✅ Full support |
+| PostgreSQL | ✅ Full support |
+| MySQL | ✅ Full support |
+| Oracle | ✅ Full support |
+| MongoDB | ✅ Requires replica set |
+| In-Memory | ❌ Not supported |
+
+---
+
 ## Migrations
 
 ### Creating a Migration
@@ -440,6 +472,7 @@ This generates decorated entity files and a DbContext with typed DbSets for each
 | `@romatech/orm-providers-mysql` | MySQL / MariaDB | `npm i @romatech/orm-providers-mysql` |
 | `@romatech/orm-providers-pgsql` | PostgreSQL | `npm i @romatech/orm-providers-pgsql` |
 | `@romatech/orm-providers-oracle` | Oracle Database | `npm i @romatech/orm-providers-oracle` |
+| `@romatech/orm-providers-mongodb` | MongoDB (NoSQL) | `npm i @romatech/orm-providers-mongodb` |
 | `@romatech/orm-providers-memory` | In-Memory (testing) | `npm i @romatech/orm-providers-memory` |
 
 ---

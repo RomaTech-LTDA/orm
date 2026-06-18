@@ -25,6 +25,7 @@
 export * from './db-context.js';
 export * from './decorators.js';
 export * from './provider.js';
+export * from './transaction.js';
 export * from './query-builder.js';
 export * from './query-expression.js';
 export * from './sql-query-builder.js';

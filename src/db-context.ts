@@ -3,6 +3,7 @@ import { ConnectionState } from './connection-state-enum';
 import { DbContextOptions } from './db-context-options';
 import { IDbProvider } from './provider';
 import { getTableName } from './decorators';
+import { Transaction, isTransactionalProvider } from './transaction';
 
 /** Generic constructor type for entity classes. */
 type EntityConstructor<T extends object> = new (...args: any[]) => T;
@@ -207,6 +208,47 @@ export abstract class DbContext {
             await dbSet.flushChanges();
         }
         await this._provider.saveChanges();
+    }
+
+    // ─── Transactions ────────────────────────────────────────────────────────────
+
+    /**
+     * Begins a new database transaction.
+     *
+     * @example
+     * ```ts
+     * const tx = await db.beginTransaction();
+     * try {
+     *     db.users.add(newUser);
+     *     db.orders.add(newOrder);
+     *     await db.saveChanges();
+     *     await tx.commit();
+     * } catch (err) {
+     *     await tx.rollback();
+     *     throw err;
+     * }
+     * ```
+     *
+     * @throws If the provider does not support transactions.
+     */
+    public async beginTransaction(): Promise<Transaction> {
+        await this.ensureConnected();
+
+        if (isTransactionalProvider(this._provider)) {
+            await this._provider.beginTransaction();
+            return new Transaction(this._provider);
+        }
+
+        // Fallback: use raw BEGIN query for providers that support SQL
+        try {
+            await this._provider.executeQuery('BEGIN', []);
+            return new Transaction(this._provider);
+        } catch {
+            throw new Error(
+                'This provider does not support transactions. ' +
+                'Use a provider that implements ITransactionalProvider.'
+            );
+        }
     }
 
     // ─── Static Factory ──────────────────────────────────────────────────────────
