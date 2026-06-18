@@ -27,16 +27,19 @@ fi
 
 # 2. Ensure npm is logged in
 echo "[1/8] Checking npm authentication..."
-if ! npm whoami &>/dev/null; then
-    echo "ERROR: Not logged in to npm. Run 'npm login' first."
+if [ -n "${NPM_TOKEN:-}" ]; then
+    echo "       Using NPM_TOKEN from environment"
+    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+elif ! npm whoami &>/dev/null; then
+    echo "ERROR: Not logged in to npm. Set NPM_TOKEN or run 'npm login' first."
     exit 1
 fi
-echo "       Logged in as: $(npm whoami)"
+echo "       Authenticated as: $(npm whoami 2>/dev/null || echo 'token-based')"
 echo ""
 
 # 3. Install dependencies
 echo "[2/8] Installing dependencies..."
-npm ci --silent
+npm install --legacy-peer-deps
 echo "       Done."
 echo ""
 
