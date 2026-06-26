@@ -110,19 +110,59 @@ export const Column = (options: ColumnOptions = {}): PropertyDecorator => (targe
 /**
  * Marks a property as the primary key of the entity.
  * Also registers it as a column with a unique constraint.
+ * Can be applied to multiple properties for composite keys.
  *
  * @param options - Optional column configuration.
  *
  * @example
  * ```ts
+ * // Single primary key
  * @PrimaryKey()
  * id!: number;
+ *
+ * // Composite primary key
+ * @PrimaryKey()
+ * orderId!: number;
+ * @PrimaryKey()
+ * productId!: number;
  * ```
  */
 export const PrimaryKey = (options: ColumnOptions = {}): PropertyDecorator => (target, propertyKey) => {
+    // Support composite keys — store as array
+    let keys: (string | symbol)[] = Reflect.getMetadata('entity:primaryKeys', target.constructor) || [];
+    keys.push(propertyKey);
+    Reflect.defineMetadata('entity:primaryKeys', keys, target.constructor);
+    // Keep backward compat — single PK
     Reflect.defineMetadata('entity:primaryKey', propertyKey, target.constructor);
     ensureColumnMetadata(target, propertyKey, { ...options, unique: true });
 };
+
+/**
+ * Marks a property as a version/concurrency token.
+ * Used for optimistic concurrency control — the ORM checks this value
+ * on update and throws if it changed since the entity was loaded.
+ *
+ * @example
+ * ```ts
+ * @Entity('Products')
+ * class Product {
+ *     @PrimaryKey() id!: number;
+ *     @Column() name!: string;
+ *     @Version() version!: number;
+ * }
+ * ```
+ */
+export const Version: PropertyDecorator = (target, propertyKey) => {
+    Reflect.defineMetadata('entity:version', propertyKey, target.constructor);
+    ensureColumnMetadata(target, propertyKey, {});
+};
+
+/**
+ * Returns the property marked as @Version for the given entity.
+ */
+export function getVersionProperty(target: Function): string | symbol | undefined {
+    return Reflect.getMetadata('entity:version', target);
+}
 
 // ─── @NotMapped ──────────────────────────────────────────────────────────────────
 
@@ -276,6 +316,13 @@ export function getColumns(target: Function): Array<{ propertyKey: string | symb
  */
 export function getPrimaryKey(target: Function): string | symbol | undefined {
     return Reflect.getMetadata('entity:primaryKey', target);
+}
+
+/**
+ * Returns all properties marked as `@PrimaryKey` (supports composite keys).
+ */
+export function getPrimaryKeys(target: Function): (string | symbol)[] {
+    return Reflect.getMetadata('entity:primaryKeys', target) || [];
 }
 
 /**

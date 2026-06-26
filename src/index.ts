@@ -24,8 +24,14 @@
 
 export * from './db-context.js';
 export * from './decorators.js';
+export * from './index-decorators.js';
+export * from './soft-delete.js';
+export * from './query-filters.js';
+export * from './change-tracker.js';
+export * from './include-builder.js';
 export * from './provider.js';
 export * from './transaction.js';
+export * from './retry-policy.js';
 export * from './query-builder.js';
 export * from './query-expression.js';
 export * from './sql-query-builder.js';

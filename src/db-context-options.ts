@@ -1,4 +1,5 @@
 import { IDbProvider } from './provider';
+import { RetryPolicyOptions } from './retry-policy';
 
 /**
  * Configuration object passed to a {@link DbContext} constructor.
@@ -15,6 +16,16 @@ export class DbContextOptions {
     private _provider?: IDbProvider;
     private _connectionString?: string;
     private _autoConnect: boolean = true;
+    private _retryPolicy?: RetryPolicyOptions;
+    private _poolConfig?: PoolConfig;
+
+    /**
+     * Configuration for connection pooling.
+     */
+    public withPooling(config: PoolConfig): this {
+        this._poolConfig = config;
+        return this;
+    }
 
     /**
      * Sets the database provider for this context.
@@ -50,6 +61,21 @@ export class DbContextOptions {
         return this;
     }
 
+    /**
+     * Configures connection retry with exponential backoff.
+     *
+     * @example
+     * ```ts
+     * new DbContextOptions()
+     *     .useProvider(provider)
+     *     .withRetryPolicy({ maxRetries: 5, initialDelayMs: 2000 })
+     * ```
+     */
+    public withRetryPolicy(options: RetryPolicyOptions): this {
+        this._retryPolicy = options;
+        return this;
+    }
+
     /** Returns the configured provider. Throws if none was set. */
     public get provider(): IDbProvider {
         if (!this._provider) {
@@ -67,4 +93,29 @@ export class DbContextOptions {
     public get autoConnect(): boolean {
         return this._autoConnect;
     }
+
+    /** Returns the retry policy configuration, or undefined. */
+    public get retryPolicy(): RetryPolicyOptions | undefined {
+        return this._retryPolicy;
+    }
+
+    /** Returns the pool configuration, or undefined. */
+    public get poolConfig(): PoolConfig | undefined {
+        return this._poolConfig;
+    }
+}
+
+/**
+ * Connection pool configuration.
+ * Providers that support pooling will use these settings.
+ */
+export interface PoolConfig {
+    /** Minimum number of connections in the pool. Default: 2 */
+    min?: number;
+    /** Maximum number of connections in the pool. Default: 10 */
+    max?: number;
+    /** Time in ms a connection can be idle before being closed. Default: 30000 */
+    idleTimeoutMs?: number;
+    /** Time in ms to wait for a connection from the pool. Default: 5000 */
+    acquireTimeoutMs?: number;
 }

@@ -39,17 +39,21 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Decorator-based entities** | `@Entity`, `@Column`, `@PrimaryKey`, `@NotMapped`, relationships |
+| **Decorator-based entities** | `@Entity`, `@Column`, `@PrimaryKey`, `@NotMapped`, `@Version`, `@Index`, `@SoftDelete`, relationships |
 | **DbContext** | Unit-of-Work pattern with `saveChanges()` |
 | **DbSet\<T\>** | Typed sets with CRUD, change tracking, and fluent queries |
 | **QueryBuilder** | LINQ-style API: `where`, `select`, `orderBy`, `skip`, `take`, `first`, `single`, `any`, `all`, `count` |
-| **SQL generation** | Predicates and orderings are pushed to the database when parseable |
-| **Client-side fallback** | Unparseable expressions are evaluated in-memory transparently |
-| **Auto-connect** | Connection opens automatically on the first database operation |
+| **Transactions** | `beginTransaction()`, `commit()`, `rollback()` for atomic operations |
+| **Bulk operations** | `bulkInsert()`, `bulkUpdate()`, `upsert()` for high-performance writes |
+| **Raw SQL** | `rawQuery<T>(sql, params)` for complex queries |
+| **Batch operations** | `deleteWhere()`, `updateWhere()` without loading entities |
+| **Change tracking** | Dirty field detection, entity state (Added/Modified/Deleted) |
+| **Global query filters** | Multi-tenancy, soft-delete auto-filtering |
+| **Connection resilience** | Retry policy with exponential backoff, connection pooling |
+| **Eager loading** | `IncludeBuilder` with `.include().thenInclude()` |
 | **Migrations** | Create, apply, and revert schema changes via JSON migration files |
 | **Scaffold** | Reverse-engineer entities and DbContext from an existing database |
-| **Multiple providers** | SQL Server, MySQL, PostgreSQL, Oracle, MongoDB, In-Memory |
-| **Transactions** | `beginTransaction()`, `commit()`, `rollback()` for atomic operations |
+| **Multiple providers** | SQL Server, MySQL, PostgreSQL, Oracle, MongoDB, SQLite, In-Memory |
 | **Dual naming** | Both camelCase (`where`, `toList`) and PascalCase (`Where`, `ToList`) |
 
 ---
@@ -69,6 +73,7 @@ npm install @romatech/orm-providers-mysql    # MySQL / MariaDB
 npm install @romatech/orm-providers-pgsql    # PostgreSQL
 npm install @romatech/orm-providers-oracle   # Oracle
 npm install @romatech/orm-providers-mongodb  # MongoDB (NoSQL)
+npm install @romatech/orm-providers-sqlite   # SQLite (local/embedded)
 npm install @romatech/orm-providers-memory   # In-Memory (testing)
 ```
 
@@ -473,6 +478,7 @@ This generates decorated entity files and a DbContext with typed DbSets for each
 | `@romatech/orm-providers-pgsql` | PostgreSQL | `npm i @romatech/orm-providers-pgsql` |
 | `@romatech/orm-providers-oracle` | Oracle Database | `npm i @romatech/orm-providers-oracle` |
 | `@romatech/orm-providers-mongodb` | MongoDB (NoSQL) | `npm i @romatech/orm-providers-mongodb` |
+| `@romatech/orm-providers-sqlite` | SQLite (local/embedded) | `npm i @romatech/orm-providers-sqlite` |
 | `@romatech/orm-providers-memory` | In-Memory (testing) | `npm i @romatech/orm-providers-memory` |
 
 ---

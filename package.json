@@ -1,6 +1,6 @@
 {
     "name": "@romatech/orm",
-    "version": "1.2.0",
+    "version": "2.0.0",
     "description": "TypeScript ORM for Node.js inspired by Entity Framework Core",
     "author": "RomaTech/Leandro Romanelli",
     "license": "MIT",

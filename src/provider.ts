@@ -58,6 +58,26 @@ export interface IDbProvider {
     /** Returns all rows from the specified table. */
     getAll<T>(tableName: string): Promise<T[]>;
 
+    // ─── Bulk Operations ─────────────────────────────────────────────────────────
+
+    /**
+     * Inserts entities in batches for better performance.
+     * Default implementation falls back to addRange.
+     */
+    bulkInsert?<T extends object>(entities: T[], tableName: string, batchSize?: number): Promise<void>;
+
+    /**
+     * Updates entities in batches for better performance.
+     * Default implementation falls back to sequential updates.
+     */
+    bulkUpdate?<T extends object>(entities: T[], tableName: string, batchSize?: number): Promise<void>;
+
+    /**
+     * Inserts or updates an entity based on primary key existence.
+     * If the entity exists (by PK), updates it. Otherwise, inserts.
+     */
+    upsert?<T extends object>(entity: T, tableName: string): Promise<void>;
+
     // ─── Unit of Work ────────────────────────────────────────────────────────────
 
     /** Flushes any batched changes to the database (provider-specific). */
@@ -136,4 +156,11 @@ export interface IDbProvider {
 
     /** Closes the database connection. */
     disconnect(): Promise<void>;
+
+    /**
+     * Checks if the database connection is alive.
+     * Returns true if connected and responsive, false otherwise.
+     * Implementations should be lightweight (e.g. SELECT 1).
+     */
+    ping?(): Promise<boolean>;
 }

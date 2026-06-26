@@ -4,6 +4,7 @@ import { DbContextOptions } from './db-context-options';
 import { IDbProvider } from './provider';
 import { getTableName } from './decorators';
 import { Transaction, isTransactionalProvider } from './transaction';
+import { withRetry, type RetryPolicyOptions } from './retry-policy';
 
 /** Generic constructor type for entity classes. */
 type EntityConstructor<T extends object> = new (...args: any[]) => T;
@@ -38,6 +39,7 @@ export abstract class DbContext {
 
     private _autoConnect: boolean;
     private _connectionString?: string;
+    private _retryPolicy?: RetryPolicyOptions;
 
     /**
      * Creates a new context instance.
@@ -48,6 +50,7 @@ export abstract class DbContext {
         this._provider = options.provider;
         this._autoConnect = options.autoConnect;
         this._connectionString = options.connectionString;
+        this._retryPolicy = options.retryPolicy;
         this.initializeDbSets();
     }
 
@@ -104,7 +107,12 @@ export abstract class DbContext {
         this._connectPromise = (async () => {
             this._connectionState = ConnectionState.Connecting;
             try {
-                await this._provider.connect(this._connectionString ?? '');
+                const connectFn = () => this._provider.connect(this._connectionString ?? '');
+                if (this._retryPolicy) {
+                    await withRetry(connectFn, this._retryPolicy);
+                } else {
+                    await connectFn();
+                }
                 this._connectionState = ConnectionState.Connected;
             } catch (error) {
                 this._connectionState = ConnectionState.Error;
@@ -206,6 +214,143 @@ export abstract class DbContext {
         await this.ensureConnected();
         for (const dbSet of this._dbSets.values()) {
             await dbSet.flushChanges();
+        }
+        await this._provider.saveChanges();
+    }
+
+    // ─── Raw SQL ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Executes a raw SQL query and returns typed results.
+     * Use parameterized queries to prevent SQL injection.
+     *
+     * @example
+     * ```ts
+     * const users = await db.rawQuery<User>('SELECT * FROM "Users" WHERE age > ?', [18]);
+     * const count = await db.rawQuery<{total: number}>('SELECT COUNT(*) as total FROM "Orders"');
+     * ```
+     */
+    public async rawQuery<T = any>(sql: string, params?: any[]): Promise<T[]> {
+        await this.ensureConnected();
+        return this._provider.executeQuery<T>(sql, params);
+    }
+
+    /**
+     * Executes a raw SQL command (INSERT, UPDATE, DELETE) without returning results.
+     *
+     * @example
+     * ```ts
+     * await db.rawExecute('DELETE FROM "Users" WHERE age > ?', [100]);
+     * await db.rawExecute('UPDATE "Products" SET stock = stock - 1 WHERE id = ?', [productId]);
+     * ```
+     */
+    public async rawExecute(sql: string, params?: any[]): Promise<void> {
+        await this.ensureConnected();
+        await this._provider.executeQuery(sql, params);
+    }
+
+    // ─── Batch Operations (without loading entities) ─────────────────────────────
+
+    /**
+     * Deletes all entities matching a condition without loading them.
+     * Executes a single DELETE query directly on the database.
+     *
+     * @example
+     * ```ts
+     * await db.deleteWhere('Users', 'age > ?', [100]);
+     * await db.deleteWhere('Orders', 'status = ? AND created_at < ?', ['cancelled', '2024-01-01']);
+     * ```
+     */
+    public async deleteWhere(tableName: string, whereClause: string, params?: any[]): Promise<void> {
+        await this.ensureConnected();
+        await this._provider.executeQuery(`DELETE FROM "${tableName}" WHERE ${whereClause}`, params);
+    }
+
+    /**
+     * Updates all entities matching a condition without loading them.
+     * Executes a single UPDATE query directly on the database.
+     *
+     * @example
+     * ```ts
+     * await db.updateWhere('Products', 'stock = 0', 'price > ?', [1000]);
+     * await db.updateWhere('Users', 'active = false', 'last_login < ?', ['2023-01-01']);
+     * ```
+     */
+    public async updateWhere(tableName: string, setClause: string, whereClause: string, params?: any[]): Promise<void> {
+        await this.ensureConnected();
+        await this._provider.executeQuery(`UPDATE "${tableName}" SET ${setClause} WHERE ${whereClause}`, params);
+    }
+
+    // ─── Bulk Operations ────────────────────────────────────────────────────────
+
+    /**
+     * Inserts a large number of entities efficiently using batching.
+     *
+     * @param tableName - The table to insert into.
+     * @param entities - Array of entities to insert.
+     * @param batchSize - Number of entities per batch. Default: 1000.
+     */
+    public async bulkInsert<T extends object>(tableName: string, entities: T[], batchSize = 1000): Promise<void> {
+        await this.ensureConnected();
+
+        if (this._provider.bulkInsert) {
+            await this._provider.bulkInsert(entities, tableName, batchSize);
+            return;
+        }
+
+        // Fallback: batch addRange calls
+        for (let i = 0; i < entities.length; i += batchSize) {
+            const batch = entities.slice(i, i + batchSize);
+            await this._provider.addRange(batch, tableName);
+        }
+        await this._provider.saveChanges();
+    }
+
+    /**
+     * Updates a large number of entities efficiently using batching.
+     *
+     * @param tableName - The table to update.
+     * @param entities - Array of entities to update.
+     * @param batchSize - Number of entities per batch. Default: 1000.
+     */
+    public async bulkUpdate<T extends object>(tableName: string, entities: T[], batchSize = 1000): Promise<void> {
+        await this.ensureConnected();
+
+        if (this._provider.bulkUpdate) {
+            await this._provider.bulkUpdate(entities, tableName, batchSize);
+            return;
+        }
+
+        // Fallback: sequential updates in batches
+        for (let i = 0; i < entities.length; i += batchSize) {
+            const batch = entities.slice(i, i + batchSize);
+            for (const entity of batch) {
+                await this._provider.update(entity, tableName);
+            }
+        }
+        await this._provider.saveChanges();
+    }
+
+    /**
+     * Inserts or updates an entity based on primary key existence.
+     *
+     * @param tableName - The table name.
+     * @param entity - The entity to upsert.
+     */
+    public async upsert<T extends object>(tableName: string, entity: T): Promise<void> {
+        await this.ensureConnected();
+
+        if (this._provider.upsert) {
+            await this._provider.upsert(entity, tableName);
+            return;
+        }
+
+        // Fallback: find then add or update
+        const existing = await this._provider.find(entity, tableName);
+        if (existing) {
+            await this._provider.update(entity, tableName);
+        } else {
+            await this._provider.add(entity, tableName);
         }
         await this._provider.saveChanges();
     }
