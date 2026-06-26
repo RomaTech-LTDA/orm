@@ -2,6 +2,11 @@
 
 All notable changes to @romatech/orm will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Standardized `index.html` landing page (GitHub Pages) with new template: header, hero, quick start, features grid, install command, footer
+
 ## [2.0.0] - 2026-06-26
 
 ### Added
