@@ -333,6 +333,15 @@ re-apply the original JavaScript predicate to the rows that come back, so the
 result always follows JavaScript semantics. The generated `WHERE` may return
 more rows than the predicate accepts, but it is built never to return fewer.
 
+This assumes the driver returns each column with the JavaScript type of the
+literal it is compared with. Some drivers do not: node-postgres returns
+`bigint` and `numeric` columns as strings, and mysql2 returns `BOOLEAN`
+(`TINYINT(1)`) columns as `0`/`1`. On such columns, `!==` / `!=` with a number
+or boolean follows SQL (`u.id !== 5` does not return the row whose id is `5`,
+although `'5' !== 5` is `true` in JavaScript), and `===` with a number or
+boolean matches no row in memory. Compare such columns with literals of the
+type the driver returns, or configure the driver's type parsing.
+
 Translated to SQL (literal values only, on direct properties of the lambda
 parameter):
 

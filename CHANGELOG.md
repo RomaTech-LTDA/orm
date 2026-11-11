@@ -12,7 +12,7 @@ All notable changes to @romatech/orm will be documented in this file.
 - `downgradeDatabase()` only reverts migrations whose file exists in `migrationsPath`; a name read from the history table that is not a migration file (e.g. `../../x`) is rejected before anything runs.
 
 ### Fixed
-- **The SQL `WHERE` never drops rows the JavaScript predicate accepts.** The providers re-apply the predicate in memory, so the server filter may be wider but never narrower. These are no longer translated (they run in memory):
+- **The SQL `WHERE` never drops rows the JavaScript predicate accepts** (as long as the driver returns column values with the JavaScript type of the literal; see the README for drivers that return `bigint`/`numeric` as strings or booleans as `0`/`1`). The providers re-apply the predicate in memory, so the server filter may be wider but never narrower. These are no longer translated (they run in memory):
   - block bodies with more than one statement (only the first `return` used to be translated) and lambdas without a parameter (outer variables were treated as columns);
   - bare members of properties that are not known to be boolean (`u => u.name` became `name = true`: a type error on SQL Server/PostgreSQL, fewer rows on MySQL);
   - string `!==`, `<`, `<=`, `>`, `>=` and every negated `.includes()` / `.startsWith()` / `.endsWith()` (case-insensitive collations and trailing-space padding rejected rows JavaScript accepts);
