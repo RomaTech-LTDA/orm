@@ -13,7 +13,10 @@ export interface QueryFilter<T = any> {
 
 /**
  * Registry for global query filters.
- * Filters are applied automatically to all queries on matching tables.
+ *
+ * **Filters are not applied automatically** by `DbSet` / `QueryBuilder`:
+ * call {@link QueryFilterRegistry.apply} on the rows you load. Do not rely on
+ * this registry alone for tenant isolation.
  *
  * @example
  * ```ts
@@ -29,9 +32,12 @@ export interface QueryFilter<T = any> {
  *     predicate: (user) => user.deletedAt == null,
  * });
  *
+ * // Apply the enabled filters to loaded rows
+ * const users = queryFilters.apply('Users', await db.users.ToList());
+ *
  * // Temporarily disable a filter
  * queryFilters.disable('Users', 'softDelete');
- * const allUsers = await db.users.ToList(); // includes deleted
+ * const allUsers = queryFilters.apply('Users', await db.users.ToList()); // includes deleted
  * queryFilters.enable('Users', 'softDelete');
  * ```
  */

@@ -6,6 +6,19 @@ import { getTableName } from './decorators';
 import { Transaction, isTransactionalProvider } from './transaction';
 import { withRetry, type RetryPolicyOptions } from './retry-policy';
 
+/**
+ * Quotes a table name with the provider's dialect when it implements
+ * `quoteIdentifier`, otherwise as an ANSI identifier. Embedded quote
+ * characters are escaped so the name can never close the identifier and
+ * inject SQL.
+ */
+function quoteTableName(provider: IDbProvider, tableName: string): string {
+    if (typeof provider.quoteIdentifier === 'function') {
+        return provider.quoteIdentifier(tableName);
+    }
+    return `"${tableName.replace(/"/g, '""')}"`;
+}
+
 /** Generic constructor type for entity classes. */
 type EntityConstructor<T extends object> = new (...args: any[]) => T;
 
@@ -255,30 +268,43 @@ export abstract class DbContext {
      * Deletes all entities matching a condition without loading them.
      * Executes a single DELETE query directly on the database.
      *
+     * The table name is quoted with the provider's `quoteIdentifier()` when it
+     * has one, otherwise as an ANSI identifier (`"name"`). `whereClause` is
+     * raw SQL: never concatenate user input into it — pass values in
+     * `params`, using the placeholder syntax of your provider (`?` on MySQL,
+     * `$1` on PostgreSQL, `@param0` on SQL Server, `:1` on Oracle).
+     *
      * @example
      * ```ts
+     * // MySQL placeholders
      * await db.deleteWhere('Users', 'age > ?', [100]);
      * await db.deleteWhere('Orders', 'status = ? AND created_at < ?', ['cancelled', '2024-01-01']);
      * ```
      */
     public async deleteWhere(tableName: string, whereClause: string, params?: any[]): Promise<void> {
         await this.ensureConnected();
-        await this._provider.executeQuery(`DELETE FROM "${tableName}" WHERE ${whereClause}`, params);
+        await this._provider.executeQuery(`DELETE FROM ${quoteTableName(this._provider, tableName)} WHERE ${whereClause}`, params);
     }
 
     /**
      * Updates all entities matching a condition without loading them.
      * Executes a single UPDATE query directly on the database.
      *
+     * The table name is quoted with the provider's `quoteIdentifier()` when it
+     * has one, otherwise as an ANSI identifier (`"name"`). `setClause` and
+     * `whereClause` are raw SQL: never concatenate user input into them — pass
+     * values in `params`, using the placeholder syntax of your provider.
+     *
      * @example
      * ```ts
+     * // MySQL placeholders
      * await db.updateWhere('Products', 'stock = 0', 'price > ?', [1000]);
      * await db.updateWhere('Users', 'active = false', 'last_login < ?', ['2023-01-01']);
      * ```
      */
     public async updateWhere(tableName: string, setClause: string, whereClause: string, params?: any[]): Promise<void> {
         await this.ensureConnected();
-        await this._provider.executeQuery(`UPDATE "${tableName}" SET ${setClause} WHERE ${whereClause}`, params);
+        await this._provider.executeQuery(`UPDATE ${quoteTableName(this._provider, tableName)} SET ${setClause} WHERE ${whereClause}`, params);
     }
 
     // ─── Bulk Operations ────────────────────────────────────────────────────────

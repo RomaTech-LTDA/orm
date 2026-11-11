@@ -18,8 +18,36 @@
  */
 
 import { IDbProvider } from './provider';
+import { DbContext } from './db-context';
 import fs from 'fs';
 import path from 'path';
+
+/**
+ * Names a generated entity class must never take: the identifiers imported by
+ * the generated files, and globals used as column types (a class named `Date`
+ * would shadow the `Date` type of its own columns).
+ */
+const RESERVED_CLASS_NAMES = new Set([
+    'Entity', 'Column', 'PrimaryKey', 'DbContext', 'DbSet',
+    'Array', 'BigInt', 'Boolean', 'Buffer', 'Date', 'Error', 'Function', 'JSON',
+    'Map', 'Math', 'Number', 'Object', 'Partial', 'Promise', 'Record', 'RegExp',
+    'Set', 'String', 'Symbol'
+]);
+
+/** Property names a generated entity class must never declare. */
+const RESERVED_PROPERTY_NAMES = new Set(['constructor', '__proto__']);
+
+/**
+ * Members of `DbContext` (methods, accessors and instance fields) that a
+ * generated `DbSet` getter must never override.
+ */
+function getReservedContextMembers(): Set<string> {
+    return new Set([
+        ...Object.getOwnPropertyNames(DbContext.prototype),
+        '_dbSets', '_connectionState', '_connectPromise', '_provider',
+        '_autoConnect', '_connectionString', '_retryPolicy', '__proto__'
+    ]);
+}
 
 /**
  * Internal representation of a column during scaffold generation.
@@ -61,6 +89,10 @@ export class ScaffoldService {
         contextDir = '.',
         contextName = 'AppDbContext'
     ): Promise<void> {
+        if (!isIdentifier(contextName)) {
+            throw new Error(`Invalid DbContext class name '${contextName}': use a valid TypeScript identifier.`);
+        }
+
         const tables = await this.provider.getTables();
 
         if (!fs.existsSync(outputDir)) {
@@ -68,10 +100,21 @@ export class ScaffoldService {
         }
 
         const entityClassNames: string[] = [];
+        // The context file may share the directory with the entity files
+        const usedFileNames = new Set<string>([contextName.toLowerCase()]);
 
         for (const table of tables) {
             const columns = await this.provider.getColumnsForTable(table);
-            const className = this.toPascalCase(table);
+            // Table names come from the database: the class name is also the
+            // file name, so it must be a plain identifier (no path segments),
+            // unique ignoring case (Windows and macOS file systems are
+            // case-insensitive, so 'Users' and 'USERS' would share a file) and
+            // must not shadow an imported or global name.
+            const className = uniqueName(
+                this.toClassName(table),
+                candidate => usedFileNames.has(candidate.toLowerCase()) || RESERVED_CLASS_NAMES.has(candidate)
+            );
+            usedFileNames.add(className.toLowerCase());
             entityClassNames.push(className);
             const filePath = path.join(outputDir, `${className}.ts`);
             const content = this.generateEntityFileContent(className, table, columns);
@@ -96,11 +139,18 @@ export class ScaffoldService {
         table: string,
         columns: ScaffoldColumn[]
     ): string {
+        const usedProperties = new Set<string>();
         const props = columns.map(col => {
             const isId = col.name === 'id' || col.primaryKey;
-            const propertyName = this.toPropertyName(col.name);
+            // Distinct columns can map to the same property (`user_name` and
+            // `userName`), so property names get a numeric suffix when taken.
+            const propertyName = uniqueName(
+                this.toPropertyName(col.name),
+                candidate => usedProperties.has(candidate) || RESERVED_PROPERTY_NAMES.has(candidate)
+            );
+            usedProperties.add(propertyName);
             // Only add explicit name option if the property name differs from the column name
-            const options = propertyName === col.name ? '' : `{ name: '${col.name}' }`;
+            const options = propertyName === col.name ? '' : `{ name: ${toStringLiteral(col.name)} }`;
             const tsType = col.tsType || this.mapDbTypeToTsType(col.type);
             return `  @${isId ? 'PrimaryKey' : 'Column'}(${options})\n  ${propertyName}!: ${tsType};`;
         });
@@ -108,7 +158,7 @@ export class ScaffoldService {
         return `
 import { Entity, Column, PrimaryKey } from '@romatech/orm';
 
-@Entity('${table}')
+@Entity(${toStringLiteral(table)})
 export class ${className} {
 ${props.join('\n\n')}
 }
@@ -147,9 +197,22 @@ ${props.join('\n\n')}
             .map(name => `import { ${name} } from '${entityImportPath}/${name}';`)
             .join('\n');
 
+        // Getter names must not override DbContext members (a table named
+        // 'set' or 'save_changes' would otherwise break the context).
+        const reservedMembers = getReservedContextMembers();
+        const usedGetters = new Set<string>();
+        const getterNames = entityClassNames.map(name => {
+            const getter = uniqueName(
+                this.toCamelCase(name),
+                candidate => usedGetters.has(candidate) || reservedMembers.has(candidate)
+            );
+            usedGetters.add(getter);
+            return getter;
+        });
+
         const dbSets = entityClassNames
-            .map(name => [
-                `  public get ${this.toCamelCase(name)}(): DbSet<${name}> {`,
+            .map((name, index) => [
+                `  public get ${getterNames[index]}(): DbSet<${name}> {`,
                 `    return this.set(${name});`,
                 `  }`
             ].join('\n'))
@@ -186,10 +249,17 @@ ${dbSets}
     /** Converts a column name to a valid JS property name (camelCase). */
     private toPropertyName(name: string): string {
         // If already a valid identifier, keep as-is
-        if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name)) {
+        if (isIdentifier(name)) {
             return name;
         }
-        return this.toCamelCase(this.toPascalCase(name));
+        const converted = this.toCamelCase(this.toPascalCase(name));
+        return isIdentifier(converted) ? converted : this.toCamelCase(toIdentifierWords(name));
+    }
+
+    /** Converts a table name to a PascalCase class name that is a valid identifier. */
+    private toClassName(table: string): string {
+        const converted = this.toPascalCase(table);
+        return isIdentifier(converted) ? converted : toIdentifierWords(table);
     }
 
     /**
@@ -232,3 +302,40 @@ ${dbSets}
         return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
     }
 }
+
+/** Appends a numeric suffix (2, 3, …) to `name` while `isTaken` says it is taken. */
+function uniqueName(name: string, isTaken: (candidate: string) => boolean): string {
+    let candidate = name;
+    for (let suffix = 2; isTaken(candidate); suffix++) {
+        candidate = `${name}${suffix}`;
+    }
+    return candidate;
+}
+
+/** Returns `true` when `value` is a plain JavaScript identifier. */
+function isIdentifier(value: string): boolean {
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(value);
+}
+
+/**
+ * Builds a PascalCase identifier from the alphanumeric words of `value`
+ * (e.g. `'../../my table'` → `'MyTable'`, `'2024 sales'` → `'_2024Sales'`).
+ */
+function toIdentifierWords(value: string): string {
+    const words = value.split(/[^A-Za-z0-9$]+/).filter(Boolean);
+    const name = words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('') || 'Entity';
+    return /^[0-9]/.test(name) ? `_${name}` : name;
+}
+
+/** Renders `value` as a single-quoted TypeScript string literal. */
+function toStringLiteral(value: string): string {
+    const escaped = value
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+    return `'${escaped}'`;
+}
+

@@ -14,6 +14,8 @@
  */
 
 import { IDbProvider } from './provider';
+import { compareValues } from './compare-values';
+import { getBooleanFields } from './entity-fields';
 import {
     getSelectorField,
     parsePredicate,
@@ -214,7 +216,7 @@ export class QueryBuilder<T, TResult = T> {
      */
     where(predicate: QueryPredicate<T>): QueryBuilder<T, TResult> {
         this.predicates.push(predicate);
-        const expression = parsePredicate(predicate);
+        const expression = parsePredicate(predicate, { booleanFields: getBooleanFields(this.entityType) });
         if (expression) {
             this.whereExpressions.push(expression);
         }
@@ -572,8 +574,12 @@ export class QueryBuilder<T, TResult = T> {
      * ```
      */
     async all(predicate: QueryPredicate<T>): Promise<boolean> {
-        const list = await this.toList();
-        return (list as unknown as T[]).every(predicate);
+        // The predicate receives entities, so ignore any select() projection
+        const query = this.clone() as unknown as QueryBuilder<T, T>;
+        query.selector = undefined;
+        query.projection = undefined;
+        const list = await query.toList();
+        return list.every(predicate);
     }
 
     /** @see {@link all} — PascalCase alias. */
@@ -690,15 +696,11 @@ export class QueryBuilder<T, TResult = T> {
 
         return (a, b) => {
             for (const ordering of this.orderings) {
-                const left = ordering.selector(a);
-                const right = ordering.selector(b);
+                const comparison = compareValues(ordering.selector(a), ordering.selector(b));
 
-                if (left === right) {
-                    continue;
+                if (comparison !== 0) {
+                    return ordering.direction === 'desc' ? -comparison : comparison;
                 }
-
-                const comparison = left < right ? -1 : 1;
-                return ordering.direction === 'desc' ? -comparison : comparison;
             }
 
             return 0;

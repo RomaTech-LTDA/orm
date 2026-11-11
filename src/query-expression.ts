@@ -18,9 +18,28 @@
  *    - Binary comparisons:  `entity.field === value`
  *    - String helpers:       `entity.field.includes('x')`, `.startsWith`, `.endsWith`
  *      → translated to SQL `LIKE` patterns.
- *    - Boolean members:      `entity.isActive` / `!entity.isActive`
+ *    - Boolean members:      `entity.isActive` / `!entity.isActive` (only for
+ *      fields known to be boolean, see {@link PredicateParseOptions})
  * 4. Unrecognised expressions cause the function to return `undefined`, signalling
  *    that client-side filtering must be used as a fallback.
+ *
+ * ## Translation invariant
+ *
+ * The SQL providers send the translated WHERE to the database and then re-apply
+ * the original JavaScript predicate to the rows that come back. The server
+ * filter may therefore return *more* rows than the predicate accepts, but never
+ * fewer. Anything whose SQL meaning could be narrower than its JavaScript
+ * meaning is left untranslated (evaluated on the client):
+ *
+ * - bare members on fields not known to be boolean (`u => u.name`);
+ * - string `!=`, `<`, `<=`, `>`, `>=` and every `NOT LIKE` — case-insensitive
+ *   collations (SQL Server and MySQL defaults) and trailing-space padding would
+ *   reject rows JavaScript accepts;
+ * - nested member access (`u.address.city`, `u.name.length`);
+ * - integer literals outside the safe range and legacy octal literals.
+ *
+ * Numeric `<`, `<=`, `>`, `>=` add `OR field IS NULL` when JavaScript accepts
+ * `null` (`null < 30` is `true` because `null` becomes `0`).
  */
 
 // ---------------------------------------------------------------------------
@@ -219,6 +238,28 @@ export interface QueryObject<T, TResult = any> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Options for {@link parsePredicate}.
+ */
+export interface PredicateParseOptions {
+    /**
+     * Fields known to hold booleans. Only these are translated when used as a
+     * bare member (`u => u.active`, `u => !u.active`); on any other column a
+     * bare member would become `field = true`, which is a type error on SQL
+     * Server and PostgreSQL and drops truthy rows on MySQL.
+     *
+     * `QueryBuilder` fills this from the entity metadata (`design:type` of
+     * `Boolean`, or `@Column({ type: 'boolean' })`).
+     */
+    booleanFields?: Iterable<string>;
+}
+
+/** Internal parse state shared by the recursive parser. */
+interface ParseContext {
+    parameterName: string;
+    booleanFields: ReadonlySet<string>;
+}
+
+/**
  * Attempts to parse an arrow-function predicate into a portable
  * {@link QueryExpression} tree.
  *
@@ -228,21 +269,33 @@ export interface QueryObject<T, TResult = any> {
  * `undefined` and the provider must evaluate the predicate on the client.
  *
  * @param predicate - Arrow function predicate, e.g. `u => u.age > 18`.
+ * @param options - Optional knowledge about the entity (boolean fields).
  * @returns A {@link QueryExpression} node, or `undefined` if the expression
  *   cannot be represented as a portable query.
  *
  * @example
  * ```ts
- * const expr = parsePredicate<User>(u => u.age >= 18 && u.isActive);
+ * const expr = parsePredicate<User>(u => u.age >= 18 && u.isActive, { booleanFields: ['isActive'] });
  * // => { kind: 'logical', operator: 'and', expressions: [
  * //      { kind: 'comparison', field: 'age', operator: '>=', value: 18 },
  * //      { kind: 'comparison', field: 'isActive', operator: '=', value: true }
  * //    ] }
  * ```
  */
-export function parsePredicate<T>(predicate: QueryPredicate<T>): QueryExpression | undefined {
+export function parsePredicate<T>(predicate: QueryPredicate<T>, options?: PredicateParseOptions): QueryExpression | undefined {
     const expression = getFunctionExpression(predicate);
-    return expression ? parseBooleanExpression(expression, getParameterName(predicate)) : undefined;
+    const parameterName = getParameterName(predicate);
+
+    // Without a parameter every `x.y` in the body refers to an outer-scope
+    // variable, never to a column — translating it would filter the wrong data.
+    if (!expression || !parameterName) {
+        return undefined;
+    }
+
+    return parseBooleanExpression(expression, {
+        parameterName,
+        booleanFields: new Set(options?.booleanFields ?? [])
+    });
 }
 
 /**
@@ -316,14 +369,14 @@ export function getSelectorField<T>(selector: QuerySelector<T>): string | undefi
  * 5. Try binary comparison (`===`, `!==`, `>`, …).
  * 6. Try bare boolean member / negated member (`entity.flag`, `!entity.flag`).
  */
-function parseBooleanExpression(expression: string, parameterName?: string): QueryExpression | undefined {
+function parseBooleanExpression(expression: string, context: ParseContext): QueryExpression | undefined {
     const trimmed = stripOuterParens(expression.trim());
 
     // OR has lower precedence — try splitting on `||` first
     const orParts = splitTopLevel(trimmed, '||');
     if (orParts.length > 1) {
         const expressions = orParts
-            .map(part => parseBooleanExpression(part, parameterName))
+            .map(part => parseBooleanExpression(part, context))
             .filter((part): part is QueryExpression => part !== undefined);
         // Only promote to a logical node when every part was successfully parsed
         return expressions.length === orParts.length ? { kind: 'logical', operator: 'or', expressions } : undefined;
@@ -333,15 +386,15 @@ function parseBooleanExpression(expression: string, parameterName?: string): Que
     const andParts = splitTopLevel(trimmed, '&&');
     if (andParts.length > 1) {
         const expressions = andParts
-            .map(part => parseBooleanExpression(part, parameterName))
+            .map(part => parseBooleanExpression(part, context))
             .filter((part): part is QueryExpression => part !== undefined);
         return expressions.length === andParts.length ? { kind: 'logical', operator: 'and', expressions } : undefined;
     }
 
     // Leaf-level patterns — ordered by specificity
-    return parseStringMethodExpression(trimmed, parameterName)
-        || parseComparisonExpression(trimmed, parameterName)
-        || parseBooleanMemberExpression(trimmed, parameterName);
+    return parseStringMethodExpression(trimmed, context)
+        || parseComparisonExpression(trimmed, context)
+        || parseBooleanMemberExpression(trimmed, context);
 }
 
 /**
@@ -350,7 +403,7 @@ function parseBooleanExpression(expression: string, parameterName?: string): Que
  * Handles both `left op right` and `right op left` forms, flipping the
  * operator when the literal appears on the left-hand side.
  */
-function parseComparisonExpression(expression: string, parameterName?: string): QueryExpression | undefined {
+function parseComparisonExpression(expression: string, context: ParseContext): QueryExpression | undefined {
     const match = expression.match(/^(.+?)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+)$/);
     if (!match) {
         return undefined;
@@ -359,25 +412,96 @@ function parseComparisonExpression(expression: string, parameterName?: string): 
     const [, leftRaw, operatorRaw, rightRaw] = match;
     const left = leftRaw.trim();
     const right = rightRaw.trim();
-    const leftField = parseMemberExpression(left, parameterName);
-    const rightField = parseMemberExpression(right, parameterName);
+    const leftField = parseMemberExpression(left, context.parameterName);
+    const rightField = parseMemberExpression(right, context.parameterName);
 
     if (leftField && !rightField) {
         const value = parseLiteral(right);
-        return value.parsed
-            ? { kind: 'comparison', field: leftField, operator: mapOperator(operatorRaw), value: value.value }
+        return value.parsed && isTranslatableComparison(operatorRaw, value.value)
+            ? createComparison(leftField, mapOperator(operatorRaw), value.value)
             : undefined;
     }
 
     if (rightField && !leftField) {
         // Flip: `18 < entity.age` → `entity.age > 18`
         const value = parseLiteral(left);
-        return value.parsed
-            ? { kind: 'comparison', field: rightField, operator: flipOperator(mapOperator(operatorRaw)), value: value.value }
+        return value.parsed && isTranslatableComparison(operatorRaw, value.value)
+            ? createComparison(rightField, flipOperator(mapOperator(operatorRaw)), value.value)
             : undefined;
     }
 
     return undefined;
+}
+
+/**
+ * Builds the comparison node. A numeric relational comparison that JavaScript
+ * accepts for `null` (it coerces `null` to `0`, so `null < 30` is `true`)
+ * also matches `IS NULL`, otherwise SQL would drop those rows.
+ */
+function createComparison(field: string, operator: QueryComparisonOperator, value: unknown): QueryExpression {
+    const comparison: QueryExpression = { kind: 'comparison', field, operator, value };
+
+    if (typeof value === 'number' && isRelational(operator) && compareNumbers(0, operator, value)) {
+        return {
+            kind: 'logical',
+            operator: 'or',
+            expressions: [comparison, { kind: 'comparison', field, operator: '=', value: null }]
+        };
+    }
+
+    return comparison;
+}
+
+/** Returns `true` for `<`, `<=`, `>` and `>=`. */
+function isRelational(operator: QueryComparisonOperator): boolean {
+    return operator === '<' || operator === '<=' || operator === '>' || operator === '>=';
+}
+
+/** Evaluates `left operator right` for a relational operator. */
+function compareNumbers(left: number, operator: QueryComparisonOperator, right: number): boolean {
+    switch (operator) {
+        case '<': return left < right;
+        case '<=': return left <= right;
+        case '>': return left > right;
+        case '>=': return left >= right;
+        default: return false;
+    }
+}
+
+/**
+ * Returns `false` for comparisons whose SQL translation would reject rows the
+ * JavaScript predicate accepts (the providers re-apply the predicate on the
+ * client, so the server filter may be wider but never narrower):
+ *
+ * - `field > null`, `field <= undefined`, … — JS coerces null to 0, SQL has
+ *   no equivalent (it would become `IS NULL`).
+ * - `field !== undefined` — true in JS for NULL columns, while SQL
+ *   `IS NOT NULL` would drop them.
+ * - string `!=`, `<`, `<=`, `>`, `>=` — case-insensitive collations (the
+ *   default on SQL Server and MySQL) and trailing-space padding make the SQL
+ *   comparison reject rows the JS comparison accepts (`'ABC' !== 'abc'`).
+ * - relational comparisons with a boolean — no portable SQL meaning.
+ */
+function isTranslatableComparison(operatorRaw: string, value: unknown): boolean {
+    const isEquality = operatorRaw === '===' || operatorRaw === '==';
+
+    if (value === null || value === undefined) {
+        if (operatorRaw === '!==' && value === undefined) {
+            return false;
+        }
+        return isEquality || operatorRaw === '!==' || operatorRaw === '!=';
+    }
+
+    if (isEquality) {
+        return true;
+    }
+
+    // Inequality and relational operators: numbers only, plus `!=` on booleans
+    if (typeof value === 'number') {
+        return true;
+    }
+
+    return typeof value === 'boolean' && (operatorRaw === '!==' || operatorRaw === '!=');
 }
 
 /**
@@ -389,23 +513,37 @@ function parseComparisonExpression(expression: string, parameterName?: string): 
  * - `.startsWith('x')`  → `x%`
  * - `.endsWith('x')`    → `%x`
  *
- * A leading `!` produces a `notLike` operator.
+ * A negated call (`!u.name.startsWith('a')`) is never translated: `NOT LIKE`
+ * rejects rows the JS call accepts under a case-insensitive collation, and
+ * `%` / `_` in the value would make it reject even more.
  */
-function parseStringMethodExpression(expression: string, parameterName?: string): QueryExpression | undefined {
-    const negated = expression.startsWith('!');
-    const rawExpression = negated ? expression.slice(1).trim() : expression;
-    const match = rawExpression.match(/^(.+?)\.(includes|startsWith|endsWith)\((.+)\)$/);
+function parseStringMethodExpression(expression: string, context: ParseContext): QueryExpression | undefined {
+    if (expression.startsWith('!')) {
+        return undefined;
+    }
+
+    const match = expression.match(/^(.+?)\.(includes|startsWith|endsWith)\((.+)\)$/);
 
     if (!match) {
         return undefined;
     }
 
-    const field = parseMemberExpression(match[1].trim(), parameterName);
+    const field = parseMemberExpression(match[1].trim(), context.parameterName);
     const value = parseLiteral(match[3].trim());
 
     if (!field || !value.parsed || typeof value.value !== 'string') {
         return undefined;
     }
+
+    // `\` is the default LIKE escape character in PostgreSQL and MySQL and `[`
+    // opens a character class in SQL Server, so a pattern containing either
+    // could reject rows that match the JS call. Leave those to the client.
+    if (/[\\[]/.test(value.value)) {
+        return undefined;
+    }
+
+    // `%` and `_` are LIKE wildcards: they only widen a LIKE, which is fine
+    // because the predicate is re-applied on the client.
 
     // Build the LIKE pattern based on the method used
     const pattern = match[2] === 'startsWith'
@@ -417,7 +555,7 @@ function parseStringMethodExpression(expression: string, parameterName?: string)
     return {
         kind: 'comparison',
         field,
-        operator: negated ? 'notLike' : 'like',
+        operator: 'like',
         value: pattern
     };
 }
@@ -426,26 +564,43 @@ function parseStringMethodExpression(expression: string, parameterName?: string)
  * Parses a bare boolean member access such as `entity.isActive` or
  * its negation `!entity.isActive`.
  *
- * Maps to `field = true` or `field = false` respectively.
+ * Only fields listed in {@link PredicateParseOptions.booleanFields} are
+ * translated: `field = true`, or `(field = false OR field IS NULL)` for the
+ * negation, since `!null` is `true` in JavaScript. Any other member stays on
+ * the client (`u => u.name` is truthiness, not `name = true`).
  */
-function parseBooleanMemberExpression(expression: string, parameterName?: string): QueryExpression | undefined {
+function parseBooleanMemberExpression(expression: string, context: ParseContext): QueryExpression | undefined {
     const negated = expression.startsWith('!');
     const memberExpression = negated ? expression.slice(1).trim() : expression;
-    const field = parseMemberExpression(memberExpression, parameterName);
+    const field = parseMemberExpression(memberExpression, context.parameterName);
 
-    return field
-        ? { kind: 'comparison', field, operator: '=', value: !negated }
-        : undefined;
+    if (!field || !context.booleanFields.has(field)) {
+        return undefined;
+    }
+
+    if (!negated) {
+        return { kind: 'comparison', field, operator: '=', value: true };
+    }
+
+    return {
+        kind: 'logical',
+        operator: 'or',
+        expressions: [
+            { kind: 'comparison', field, operator: '=', value: false },
+            { kind: 'comparison', field, operator: '=', value: null }
+        ]
+    };
 }
 
 /**
- * Returns the property access path if `expression` is a member access on the
- * known parameter name (e.g. `u.name`, `u.address.city`), otherwise `undefined`.
+ * Returns the property name if `expression` is a direct member access on the
+ * parameter (e.g. `u.name`), otherwise `undefined`.
+ *
+ * Nested paths (`u.address.city`, `u.name.length`) are not columns of the
+ * table, so they are never translated.
  */
-function parseMemberExpression(expression: string, parameterName?: string): string | undefined {
-    // Build a regex that anchors on the exact parameter name
-    const escapedParameter = parameterName ? escapeRegExp(parameterName) : '[A-Za-z_$][\\w$]*';
-    const match = expression.match(new RegExp(`^${escapedParameter}\\.([A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*)$`));
+function parseMemberExpression(expression: string, parameterName: string): string | undefined {
+    const match = expression.match(new RegExp(`^${escapeRegExp(parameterName)}\\.([A-Za-z_$][\\w$]*)$`));
     return match?.[1];
 }
 
@@ -494,17 +649,40 @@ function getFunctionExpression(fn: Function): string | undefined {
         const expression = source.slice(arrowIndex + 2).trim();
 
         if (expression.startsWith('{')) {
-            // Block body — extract the return expression
-            const returnMatch = expression.match(/return\s+([\s\S]*?);?\s*}/);
-            return returnMatch?.[1]?.trim();
+            return getSingleReturnExpression(expression);
         }
 
         return expression.trim();
     }
 
-    // Traditional function — look for a return statement
-    const returnMatch = source.match(/return\s+([\s\S]*?);?\s*}/);
-    return returnMatch?.[1]?.trim();
+    // Traditional function — the body is everything from the first `{`
+    const bodyStart = source.indexOf('{');
+    return bodyStart === -1 ? undefined : getSingleReturnExpression(source.slice(bodyStart));
+}
+
+/**
+ * Returns the expression of a block body that consists of exactly one
+ * `return <expression>;` statement, or `undefined` for any other body.
+ *
+ * A body with other statements (`if`, local variables, several returns) can't
+ * be represented by a single expression: translating only one of its returns
+ * would make the server filter reject rows the function accepts.
+ */
+function getSingleReturnExpression(block: string): string | undefined {
+    const match = block.trim().match(/^\{\s*return\b([\s\S]*)\}$/);
+    if (!match) {
+        return undefined;
+    }
+
+    const expression = match[1].trim().replace(/;\s*$/, '').trim();
+
+    // Any remaining statement separator or nested block/return means the body
+    // is not a single return (strings containing them simply stay client-side).
+    if (!expression || /[;{}]|\breturn\b/.test(expression)) {
+        return undefined;
+    }
+
+    return expression;
 }
 
 /**
@@ -540,12 +718,24 @@ function parseLiteral(rawValue: string): { parsed: boolean; value?: unknown } {
 
     // Quoted string — handles both ' and "
     if (/^(['"])(?:\\.|(?!\1).)*\1$/.test(value)) {
-        return { parsed: true, value: value.slice(1, -1).replace(/\\(['"\\])/g, '$1') };
+        const content = value.slice(1, -1);
+        // Only \' \" and \\ are decoded; other escapes (\n, \t, \u0041, …)
+        // would be sent verbatim and compare against the wrong value.
+        if (/\\[^'"\\]/.test(content.replace(/\\\\/g, ''))) {
+            return { parsed: false };
+        }
+        return { parsed: true, value: content.replace(/\\(['"\\])/g, '$1') };
     }
 
-    // Integer or decimal number
-    if (/^-?\d+(?:\.\d+)?$/.test(value)) {
-        return { parsed: true, value: Number(value) };
+    // Integer or decimal number. Leading zeros are rejected (`010` is a legacy
+    // octal literal, 8 in sloppy-mode JS) and so are integers JS cannot
+    // represent exactly (the parameter would be a different number).
+    if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) {
+        const number = Number(value);
+        if (!value.includes('.') && !Number.isSafeInteger(number)) {
+            return { parsed: false };
+        }
+        return { parsed: true, value: number };
     }
 
     if (value === 'true' || value === 'false') {

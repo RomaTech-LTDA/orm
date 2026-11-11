@@ -32,6 +32,8 @@ import {
     QueryObject,
     QueryOrderExpression
 } from './query-expression';
+import { compareValues } from './compare-values';
+import { getNotMappedKeys } from './entity-fields';
 
 // ─── Dialect Interface ───────────────────────────────────────────────────────────
 
@@ -134,6 +136,11 @@ export function buildSelectAllSql(tableName: string, dialect: SqlDialect): strin
  * Builds an `INSERT INTO table (cols…) VALUES (params…)` statement.
  *
  * Only includes properties that are not `undefined` on the entity object.
+ * When `entity` is an instance of an entity class, its `@NotMapped`
+ * properties are left out.
+ *
+ * Property names are used as column names: `@Column({ name })` is **not**
+ * applied here (see the README, "Known limitations").
  *
  * @param tableName - Target table.
  * @param entity - Object with column values to insert.
@@ -141,7 +148,8 @@ export function buildSelectAllSql(tableName: string, dialect: SqlDialect): strin
  * @returns Parameterised SQL command.
  */
 export function buildInsertSql<T extends object>(tableName: string, entity: T, dialect: SqlDialect): SqlCommand {
-    const entries = Object.entries(entity).filter(([, value]) => value !== undefined);
+    const notMapped = getNotMappedKeys(entity);
+    const entries = Object.entries(entity).filter(([key, value]) => value !== undefined && !notMapped.has(key));
     const columns = entries.map(([key]) => dialect.quoteIdentifier(key)).join(', ');
     const placeholders = entries.map((_, index) => dialect.parameter(index)).join(', ');
 
@@ -156,7 +164,8 @@ export function buildInsertSql<T extends object>(tableName: string, entity: T, d
 /**
  * Builds an `UPDATE table SET col=val, … WHERE pk=val` statement.
  *
- * Excludes the primary key from the SET clause.
+ * Excludes the primary key from the SET clause, and the `@NotMapped`
+ * properties when `entity` is an instance of an entity class.
  *
  * @param tableName - Target table.
  * @param entity - Object with updated column values.
@@ -170,7 +179,9 @@ export function buildUpdateSql<T extends object>(
     primaryKey: string,
     dialect: SqlDialect
 ): SqlCommand {
-    const entries = Object.entries(entity).filter(([key, value]) => key !== primaryKey && value !== undefined);
+    const notMapped = getNotMappedKeys(entity);
+    const entries = Object.entries(entity)
+        .filter(([key, value]) => key !== primaryKey && value !== undefined && !notMapped.has(key));
     const primaryKeyValue = (entity as Record<string, unknown>)[primaryKey];
     const assignments = entries
         .map(([key], index) => `${dialect.quoteIdentifier(key)} = ${dialect.parameter(index)}`)
@@ -322,6 +333,12 @@ function compileExpression(expression: QueryExpression, dialect: SqlDialect, par
     const parameter = dialect.parameter(params.length);
     params.push(expression.value);
 
+    // In JS `null !== 'x'` is true, but SQL `NULL <> 'x'` is UNKNOWN and the
+    // row would be dropped before the client-side predicate ever sees it.
+    if (expression.operator === '!=') {
+        return `(${field} != ${parameter} OR ${field} IS NULL)`;
+    }
+
     return `${field} ${toSqlOperator(expression.operator)} ${parameter}`;
 }
 
@@ -364,17 +381,4 @@ function createComparer<T>(orderings: QueryObject<T>['orderings']): ((a: T, b: T
 
         return 0;
     };
-}
-
-/**
- * Compares two values with null-safe semantics:
- * - Equal → 0
- * - null/undefined always sorts first → -1
- * - Otherwise uses standard `<` comparison.
- */
-function compareValues(left: unknown, right: unknown): number {
-    if (left === right) return 0;
-    if (left === undefined || left === null) return -1;
-    if (right === undefined || right === null) return 1;
-    return left < right ? -1 : 1;
 }

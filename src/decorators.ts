@@ -24,8 +24,16 @@ import 'reflect-metadata';
 
 type EntityConstructor<T = any> = new (...args: any[]) => T;
 
-/** Global registry of all decorated entity classes, keyed by class name. */
-const registeredEntities = new Map<string, EntityConstructor>();
+/**
+ * Global registry of all decorated entity classes, keyed by class name.
+ *
+ * Kept on `globalThis` so that every copy of this package loaded in the same
+ * process shares it — e.g. a globally installed CLI reading the entities that
+ * the project's own copy of `@romatech/orm` registered.
+ */
+const ENTITY_REGISTRY_KEY = Symbol.for('@romatech/orm:entities');
+const registeredEntities: Map<string, EntityConstructor> =
+    ((globalThis as any)[ENTITY_REGISTRY_KEY] ??= new Map<string, EntityConstructor>());
 
 // ─── @Entity ─────────────────────────────────────────────────────────────────────
 
@@ -301,6 +309,7 @@ export function getColumns(target: Function): Array<{ propertyKey: string | symb
     for (const key of allProps) {
         if (
             key !== 'constructor' &&
+            !isMethodOrAccessor(target.prototype, key) &&
             !columns.some(c => c.propertyKey === key) &&
             !notMapped.includes(key)
         ) {
@@ -309,6 +318,15 @@ export function getColumns(target: Function): Array<{ propertyKey: string | symb
     }
 
     return columns.filter(c => !notMapped.includes(c.propertyKey));
+}
+
+/**
+ * Returns `true` when `key` is a method or a getter/setter declared on the
+ * prototype — behaviour, not data, so never a convention-based column.
+ */
+function isMethodOrAccessor(prototype: object, key: string | symbol): boolean {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, key);
+    return !!descriptor && (typeof descriptor.value === 'function' || !!descriptor.get || !!descriptor.set);
 }
 
 /**

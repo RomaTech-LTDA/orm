@@ -1,9 +1,12 @@
 import 'reflect-metadata';
 
 /**
- * Marks an entity as soft-deletable.
- * When applied, `remove()` sets the delete column instead of actually deleting.
- * Queries automatically filter out soft-deleted entities.
+ * Marks an entity as soft-deletable (metadata only).
+ *
+ * **Not applied automatically yet:** `DbSet.remove()` still issues a real
+ * DELETE and queries do not hide soft-deleted rows. Read the column with
+ * {@link getSoftDeleteColumn} and implement the behaviour in your code (e.g.
+ * set the column and call `update()`, and filter with `where()`).
  *
  * @param columnName - Column that marks deletion. Default: 'deletedAt'
  *
@@ -17,14 +20,13 @@ import 'reflect-metadata';
  *     @Column() deletedAt?: Date;
  * }
  *
- * // remove() sets deletedAt = new Date() instead of DELETE
- * db.users.remove(user);
+ * // soft delete explicitly
+ * user.deletedAt = new Date();
+ * db.users.update(user);
+ * await db.saveChanges();
  *
- * // queries auto-filter: WHERE deletedAt IS NULL
- * const activeUsers = await db.users.ToList();
- *
- * // to include deleted:
- * const all = await db.users.withDeleted().ToList();
+ * // and filter explicitly
+ * const activeUsers = await db.users.where(u => u.deletedAt === null).toList();
  * ```
  */
 export function SoftDelete(columnName = 'deletedAt'): ClassDecorator {

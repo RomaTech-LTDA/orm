@@ -31,6 +31,7 @@
 - [CLI](#cli)
 - [Configuration](#configuration)
 - [API Reference](#api-reference)
+- [Known limitations](#known-limitations)
 - [License](#license)
 
 ---
@@ -39,7 +40,7 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Decorator-based entities** | `@Entity`, `@Column`, `@PrimaryKey`, `@NotMapped`, `@Version`, `@Index`, `@SoftDelete`, relationships |
+| **Decorator-based entities** | `@Entity`, `@Column`, `@PrimaryKey`, `@NotMapped`, `@Version`, `@Index`, `@SoftDelete` (metadata only), relationships |
 | **DbContext** | Unit-of-Work pattern with `saveChanges()` |
 | **DbSet\<T\>** | Typed sets with CRUD, change tracking, and fluent queries |
 | **QueryBuilder** | LINQ-style API: `where`, `select`, `orderBy`, `skip`, `take`, `first`, `single`, `any`, `all`, `count` |
@@ -48,7 +49,7 @@
 | **Raw SQL** | `rawQuery<T>(sql, params)` for complex queries |
 | **Batch operations** | `deleteWhere()`, `updateWhere()` without loading entities |
 | **Change tracking** | Dirty field detection, entity state (Added/Modified/Deleted) |
-| **Global query filters** | Multi-tenancy, soft-delete auto-filtering |
+| **Global query filters** | `QueryFilterRegistry` for multi-tenancy / soft-delete filters, applied explicitly with `queryFilters.apply()` (not automatic) |
 | **Connection resilience** | Retry policy with exponential backoff, connection pooling |
 | **Eager loading** | `IncludeBuilder` with `.include().thenInclude()` |
 | **Migrations** | Create, apply, and revert schema changes via JSON migration files |
@@ -139,6 +140,13 @@ const alice = await db.users.FirstOrDefault(u => u.name === 'Alice');
 console.log(alice); // { id: 1, name: 'Alice', email: 'alice@example.com' }
 ```
 
+> **Known limitation — read before mapping columns.** `@Column({ name })` is
+> only used by migrations and scaffold. CRUD (`add`, `update`, `remove`,
+> `find`), queries and results still use the **property name** as the column
+> name, so an entity whose property name differs from its column name does not
+> work with the SQL providers. Keep property names equal to column names. See
+> [Known limitations](#known-limitations).
+
 ---
 
 ## Entities & Decorators
@@ -173,7 +181,7 @@ name!: string;
 **ColumnOptions:**
 | Option | Type | Description |
 |--------|------|-------------|
-| `name` | `string` | Database column name (defaults to property name) |
+| `name` | `string` | Database column name (defaults to property name). **Migrations and scaffold only** — not applied by CRUD or queries (see [Known limitations](#known-limitations)) |
 | `type` | `string` | Explicit type override |
 | `nullable` | `boolean` | Whether the column allows NULL |
 | `unique` | `boolean` | Whether the column has a UNIQUE constraint |
@@ -182,7 +190,11 @@ name!: string;
 
 ### `@NotMapped`
 
-Excludes a property from the database mapping.
+Excludes a property from the database mapping: it is not a migration column,
+and `buildInsertSql` / `buildUpdateSql` (used by the SQL providers) leave it
+out when the entity is an instance of the decorated class. Plain object
+literals carry no metadata, so every defined property of them is sent; the
+MongoDB and In-Memory providers store the whole object.
 
 ```ts
 @NotMapped
@@ -314,6 +326,39 @@ const filtered = await db.users
     .toList();
 ```
 
+### What runs on the database
+
+The SQL providers send a parameterised `WHERE` to the database and then
+re-apply the original JavaScript predicate to the rows that come back, so the
+result always follows JavaScript semantics. The generated `WHERE` may return
+more rows than the predicate accepts, but it is built never to return fewer.
+
+Translated to SQL (literal values only, on direct properties of the lambda
+parameter):
+
+- `===` / `==` with a string, number, boolean or `null`;
+- `!==` / `!=` with a number or boolean → `(col != @p OR col IS NULL)`, and with `null` → `IS NOT NULL`;
+- `<`, `<=`, `>`, `>=` with a number (plus `OR col IS NULL` when JavaScript accepts `null`, e.g. `u.age < 30`, because `null < 30` is `true`);
+- `.includes()`, `.startsWith()`, `.endsWith()` → `LIKE` (not when the value contains `\` or `[`);
+- bare boolean members `u.active` / `!u.active` **only** when the property is
+  declared boolean (`@Column() active!: boolean` with `emitDecoratorMetadata`,
+  or `@Column({ type: 'boolean' })`);
+- `&&`, `||` and parentheses combining the above.
+
+Evaluated in memory, after loading the rows of the table:
+
+- outer variables, function calls, computed values and block bodies with more than one statement;
+- bare members of non-boolean properties (`u => u.name` is truthiness, not `name = true`);
+- string `!==`, `<`, `<=`, `>`, `>=` and every negated `.includes()` / `.startsWith()` / `.endsWith()`:
+  under a case-insensitive collation (the SQL Server and MySQL default) or with trailing-space padding
+  the database would reject rows JavaScript accepts (`'ABC' !== 'abc'`);
+- nested members (`u.address.city`, `u.name.length`);
+- integer literals beyond `Number.MAX_SAFE_INTEGER`, number literals with a leading zero, and string literals with escapes other than `\'`, `\"`, `\\`.
+
+String equality and `LIKE` are still sent to the database: a case-insensitive
+collation can only make them match *more* rows, which the in-memory pass then
+removes.
+
 ### Projection — `select()`
 
 ```ts
@@ -391,7 +436,9 @@ try {
 }
 ```
 
-Transaction support depends on the provider:
+Transaction support depends on the provider (and on its version — check the
+provider's README; a SQL Server provider that does not implement
+`ITransactionalProvider` cannot open a transaction):
 
 | Provider | Transactions |
 |----------|-------------|
@@ -430,6 +477,32 @@ await service.downgradeDatabase(); // Revert last
 await service.downgradeDatabase('20260605120000_Initial'); // Revert everything after this
 ```
 
+### How migrations are generated
+
+`createMigration(name)` without explicit operations compares the entity metadata with the schema described by the migration files already in the folder:
+
+- entities whose table does not exist yet → `createTable` (down: `dropTable`);
+- new properties of existing tables → `addColumn` (down: `removeColumn`).
+
+Removed entities or columns, renames and type changes are **not** detected — pass them explicitly with `createMigration(name, { up, down })`. Down operations run in reverse order.
+
+When nothing changed, `createMigration(name)` writes no file and rejects with a
+"No model changes" error. To create an intentionally empty migration, pass
+explicit operations: `createMigration(name, { up: [], down: [] })`.
+
+`downgradeDatabase()` only reverts migrations whose file is in the migrations
+folder; a name recorded in the database that is not a file there (for example
+`../x`) is rejected before anything runs.
+
+> **⚠️ Migrations generated by 2.0.0 — review them before reverting.** In
+> 2.0.0, every auto-generated migration re-created *all* tables, so its `down`
+> drops **every table** of the model, not only the ones it introduced.
+> Reverting such a migration (`downgradeDatabase()` / `orm downgrade-database`)
+> deletes all your data. Before reverting, open each `*.migration.json` created
+> with 2.0.0 and remove from `up` and `down` the operations for tables that an
+> earlier migration already created (or replace the file with explicit
+> operations).
+
 ### Migration File Format
 
 ```json
@@ -466,6 +539,16 @@ await service.generateEntitiesFromDb('src/entities', 'src/context', 'AppDbContex
 ```
 
 This generates decorated entity files and a DbContext with typed DbSets for each table found in the database.
+
+Names read from the database are turned into valid identifiers. Class (and
+file) names are unique ignoring case, never reuse an imported or global name
+(`Entity`, `DbContext`, `Date`, …) or the context name, and get a numeric
+suffix when taken (`Users`, `USERS2`). Properties that would collide
+(`user name` and `userName`) get a suffix too, and `DbSet` getters never
+override a `DbContext` member. Columns whose property name differs from the
+column name are emitted with `@Column({ name })` — see
+[Known limitations](#known-limitations): such entities do not work with CRUD
+yet, so rename the property or the column before using them.
 
 ---
 
@@ -521,6 +604,11 @@ interface SqlDialect {
 }
 ```
 
+Providers should also implement the optional `IDbProvider.quoteIdentifier()`
+(usually `id => dialect.quoteIdentifier(id)`): `DbContext.deleteWhere()` and
+`updateWhere()` use it to quote the table name, and fall back to ANSI double
+quotes without it (which MySQL rejects unless `ANSI_QUOTES` is enabled).
+
 ---
 
 ## API Reference
@@ -558,6 +646,26 @@ interface SqlDialect {
 - `QueryExpression` — Discriminated union for WHERE tree nodes
 - `QueryObject<T, TResult>` — Complete query descriptor
 - `SqlDialect` — Identifier quoting and parameter style
+
+---
+
+## Known limitations
+
+- **`@Column({ name })` is not applied by CRUD or queries.** Only migrations
+  and scaffold use it. `add`/`update`/`remove`/`find`, `where()` translation
+  and query results use property names as column names. Keep property names
+  equal to column names until entity ↔ row mapping is implemented.
+- **`@SoftDelete` and `QueryFilterRegistry` are not automatic.** `remove()`
+  issues a real `DELETE`, and filters must be applied with
+  `queryFilters.apply()`. Do not rely on them alone for tenant isolation.
+- **Queries can load more rows than they return.** The shared SQL builder only
+  sends the translated `WHERE` (and `ORDER BY`): untranslated predicates, `skip()`,
+  `take()`, `count()` and `any()` are applied in memory to the rows it
+  returns (a query with no translated predicate reads the whole table).
+- **Migrations** do not detect removed or renamed entities/columns or type
+  changes; `updateDatabase()` does not run inside a transaction.
+- **Raw SQL** in `rawQuery`, `rawExecute`, `deleteWhere` and `updateWhere` is
+  sent as written: pass values in `params`, never concatenated.
 
 ---
 

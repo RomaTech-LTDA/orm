@@ -1,6 +1,6 @@
 {
     "name": "@romatech/orm",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "TypeScript ORM for Node.js inspired by Entity Framework Core",
     "author": "RomaTech/Leandro Romanelli",
     "license": "MIT",
@@ -42,7 +42,8 @@
     "scripts": {
         "clean": "rimraf dist",
         "build": "npm run clean && tsc",
-        "watch": "tsc --watch"
+        "watch": "tsc --watch",
+        "test": "npm run build && node --test"
     },
     "dependencies": {
         "reflect-metadata": "^0.2.2"

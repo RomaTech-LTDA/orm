@@ -49,7 +49,11 @@ export class Transaction {
     if (!this.isActive) {
       throw new Error('Transaction is no longer active');
     }
-    await this._provider.executeQuery('COMMIT', []);
+    if (isTransactionalProvider(this._provider)) {
+      await this._provider.commitTransaction();
+    } else {
+      await this._provider.executeQuery('COMMIT', []);
+    }
     this._committed = true;
   }
 
@@ -61,7 +65,11 @@ export class Transaction {
     if (!this.isActive) {
       throw new Error('Transaction is no longer active');
     }
-    await this._provider.executeQuery('ROLLBACK', []);
+    if (isTransactionalProvider(this._provider)) {
+      await this._provider.rollbackTransaction();
+    } else {
+      await this._provider.executeQuery('ROLLBACK', []);
+    }
     this._rolledBack = true;
   }
 }

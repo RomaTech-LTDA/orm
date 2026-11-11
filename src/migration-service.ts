@@ -56,6 +56,9 @@ export interface MigrationFile {
     down: MigrationOperation[];
 }
 
+/** Name format of the migrations created by {@link MigrationService.createMigration}. */
+const MIGRATION_NAME_PATTERN = /^[0-9]{14}_[A-Za-z0-9_-]+$/;
+
 // ─── Service ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -80,8 +83,15 @@ export class MigrationService {
      * Creates a new migration file.
      *
      * If no explicit operations are provided, the migration is auto-generated
-     * from the current entity metadata (all decorated entities become
-     * `createTable` operations).
+     * by comparing the current entity metadata with the schema described by
+     * the migrations already in `migrationsPath`: entities whose table is not
+     * there yet become `createTable` operations and new properties of existing
+     * tables become `addColumn` operations. Removed entities/columns and type
+     * changes are not detected (write those operations explicitly).
+     *
+     * When the model has no changes, nothing is written and the promise
+     * rejects with a "No model changes" error. Pass explicit operations
+     * (`{ up: [], down: [] }`) to create an intentionally empty migration.
      *
      * @param migrationName - Human-readable name (e.g. 'AddUsersTable').
      * @param operations - Optional explicit `up` and `down` operations.
@@ -99,7 +109,13 @@ export class MigrationService {
     ): Promise<string> {
         await fs.mkdir(this.migrationsPath, { recursive: true });
 
-        const up = operations?.up ?? this.createInitialSchemaOperations();
+        const up = operations?.up ?? this.createSchemaChangeOperations(await this.readMigratedSchema());
+        if (!operations?.up && up.length === 0) {
+            throw new Error(
+                `No model changes since the last migration in '${this.migrationsPath}': no migration was created. ` +
+                'Pass explicit operations to create an empty migration.'
+            );
+        }
         const down = operations?.down ?? this.createDefaultDownOperations(up);
         const fullName = `${this.createTimestamp()}_${this.toSafeMigrationName(migrationName)}`;
 
@@ -205,6 +221,17 @@ export class MigrationService {
             toRevert = applied.length ? [applied[applied.length - 1]] : [];
         }
 
+        // Names come from the history table: only accept ones that are files in
+        // migrationsPath (never a path such as '../../x' that reads elsewhere).
+        for (const name of toRevert) {
+            if (!allMigrations.includes(name)) {
+                const reason = MIGRATION_NAME_PATTERN.test(name)
+                    ? `its file ${name}.migration.json is missing from '${this.migrationsPath}'`
+                    : `it is not a migration file name (expected ${MIGRATION_NAME_PATTERN.source})`;
+                throw new Error(`Cannot revert migration '${name}' recorded in the database: ${reason}.`);
+            }
+        }
+
         for (const name of toRevert) {
             const migration = await this.readMigrationFile(name);
             // Execute down operations in reverse order
@@ -255,6 +282,69 @@ export class MigrationService {
         const filePath = path.join(this.migrationsPath, `${name}.migration.json`);
         const content = await fs.readFile(filePath, 'utf-8');
         return JSON.parse(content);
+    }
+
+    /**
+     * Rebuilds the schema (table → column names) produced by applying, in
+     * order, the `up` operations of every migration file already present.
+     */
+    private async readMigratedSchema(): Promise<Map<string, Set<string>>> {
+        const schema = new Map<string, Set<string>>();
+        const names = (await fs.readdir(this.migrationsPath))
+            .filter(f => f.endsWith('.migration.json'))
+            .map(f => f.replace('.migration.json', ''))
+            .sort();
+
+        for (const name of names) {
+            const migration = await this.readMigrationFile(name);
+            for (const op of migration.up ?? []) {
+                switch (op.action) {
+                    case 'createTable': {
+                        const columns = schema.get(op.table) ?? new Set<string>();
+                        op.columns.forEach(column => columns.add(column.name));
+                        schema.set(op.table, columns);
+                        break;
+                    }
+                    case 'dropTable':
+                        schema.delete(op.table);
+                        break;
+                    case 'addColumn':
+                        schema.get(op.table)?.add(op.column.name);
+                        break;
+                    case 'removeColumn':
+                        schema.get(op.table)?.delete(op.columnName);
+                        break;
+                }
+            }
+        }
+
+        return schema;
+    }
+
+    /**
+     * Returns the operations that bring `schema` up to the current entity
+     * metadata: `createTable` for new tables, `addColumn` for new columns.
+     */
+    private createSchemaChangeOperations(schema: Map<string, Set<string>>): MigrationOperation[] {
+        const operations: MigrationOperation[] = [];
+
+        for (const operation of this.createInitialSchemaOperations()) {
+            if (operation.action !== 'createTable') continue;
+
+            const existing = schema.get(operation.table);
+            if (!existing) {
+                operations.push(operation);
+                continue;
+            }
+
+            for (const column of operation.columns) {
+                if (!existing.has(column.name)) {
+                    operations.push({ action: 'addColumn', table: operation.table, column });
+                }
+            }
+        }
+
+        return operations;
     }
 
     /**

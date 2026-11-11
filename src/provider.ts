@@ -149,6 +149,17 @@ export interface IDbProvider {
      */
     executeQuery<T, TResult = T>(entityName: string, query: QueryObject<T, TResult>): Promise<TResult[]>;
 
+    /**
+     * Quotes a table or column name for this provider's SQL dialect, escaping
+     * any quote character inside it (e.g. `[a]]b]` on SQL Server, `` `a``b` ``
+     * on MySQL).
+     *
+     * Optional. Used by `DbContext.deleteWhere()` / `updateWhere()`; without
+     * it those methods fall back to ANSI double quotes, which MySQL only
+     * accepts with the `ANSI_QUOTES` SQL mode.
+     */
+    quoteIdentifier?(identifier: string): string;
+
     // ─── Connection Lifecycle ────────────────────────────────────────────────────
 
     /** Opens the database connection. */
